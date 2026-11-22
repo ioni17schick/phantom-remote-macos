@@ -110,7 +110,7 @@ final class Phantom: ObservableObject {
             }
         }
     }
-    func shutdown() { pollTask?.cancel(); discovery.stop() }
+    func shutdown() { pollTask?.cancel(); discovery.stop(); Hotkeys.unregister() }
     func viewAppeared() { visibleViews += 1; Task { await refresh() } }
     func viewDisappeared() { visibleViews = max(0, visibleViews - 1) }
     func rediscover() { discovery.start() }
@@ -206,6 +206,7 @@ final class Phantom: ObservableObject {
             await pingSpeakers()
         } catch {
             guard version == revision, selected == target else { return }
+            if online && errorMessage == nil { errorMessage = "Verbindung zum Lautsprecher verloren (\(error.localizedDescription))." }
             online = false; status = "Nicht erreichbar – Geräte prüfen"
             pingMs = Dictionary(uniqueKeysWithValues: speakers.map { ($0.id, nil as Int?) })
             if case RemoteError.wrongDevice = error { errorMessage = error.localizedDescription }
@@ -213,8 +214,10 @@ final class Phantom: ObservableObject {
     }
 
     /// All mutations run sequentially, with an identity check directly before each operation.
-    private func enqueue(_ label: String, operation: @escaping @MainActor (Target) async throws -> Void) {
-        guard canControl, let selected = target else { errorMessage = RemoteError.noConnection.localizedDescription; return }
+    /// Liefert den eingereihten Task; `await enqueue(...)?.value` wartet, bis genau dieser Befehl abgeschlossen ist.
+    @discardableResult
+    private func enqueue(_ label: String, operation: @escaping @MainActor (Target) async throws -> Void) -> Task<Void, Never>? {
+        guard canControl, let selected = target else { errorMessage = RemoteError.noConnection.localizedDescription; return nil }
         revision += 1; pending += 1
         let previous = tail
         tail = Task { [weak self] in
@@ -226,12 +229,14 @@ final class Phantom: ObservableObject {
                 try await operation(selected)
             } catch {
                 self.errorMessage = "\(label): \(error.localizedDescription)"
-                // Fail closed: queued commands cannot run after an uncertain response.
-                self.online = false
+                // „Nicht unterstützt“ wird vor jedem Schreibzugriff erkannt – die Verbindung ist intakt.
+                // Alles andere ist eine unsichere Antwort: fail closed, wartende Befehle laufen nicht weiter.
+                if case RemoteError.unsupported = error {} else { self.online = false }
             }
             self.pending -= 1
             if self.pending == 0 { self.identifyQueued.removeAll(); await self.refresh() }
         }
+        return tail
     }
     func waitUntilIdle() async { await tail?.value }
     private func body(_ values: [String: Any]) throws -> Data { try JSONSerialization.data(withJSONObject: values) }
@@ -253,55 +258,55 @@ final class Phantom: ObservableObject {
         }
     }
     func step(_ delta: Int, hud: Bool = true) async {
-        enqueue("Lautstärke") { [self] selected in
+        await enqueue("Lautstärke") { [self] selected in
             let actual = try await api.get(selected.endpoint, "/systems/current/sources/current/soundControl/volume", as: DVolume.self).volume
             let safe = VolumePolicy.requested(actual + delta, current: actual, limit: volumeLimit)
             try await api.post(selected.endpoint, "/systems/current/sources/current/soundControl/volume", body: body(["volume": safe]))
             volume = Double(safe)
             if hud { HUD.show(volume: safe, muted: muted) }
-        }
+        }?.value
     }
     func toggleMute(hud: Bool = true) async {
-        enqueue("Stummschaltung") { [self] selected in
+        await enqueue("Stummschaltung") { [self] selected in
             let current = try await api.get(selected.endpoint, "/groups/current/sources/current", as: DCurrent.self)
             let value = current.muteState != "muted"
             try await api.post(selected.endpoint, "/groups/current/sources/current/playback/" + (value ? "mute" : "unmute"))
             muted = value
             if hud { HUD.show(volume: Int(volume), muted: muted) }
-        }
+        }?.value
     }
-    private func transport(_ requested: String?) {
-        enqueue("Wiedergabe") { [self] selected in
+    private func transport(_ requested: String?) async {
+        await enqueue("Wiedergabe") { [self] selected in
             let current = try await api.get(selected.endpoint, "/groups/current/sources/current", as: DCurrent.self)
             let operation = requested ?? (current.playingState == "playing" ? "pause" : "play")
             guard current.availableOperations?.contains(operation) == true else { throw RemoteError.unsupported }
             try await api.post(selected.endpoint, "/groups/current/sources/current/playback/\(operation)")
-        }
+        }?.value
     }
-    func playPause() async { transport(nil) }
-    func next() async { transport("next") }
-    func previous() async { transport("previous") }
+    func playPause() async { await transport(nil) }
+    func next() async { await transport("next") }
+    func previous() async { await transport("previous") }
     func select(_ source: DSource) async {
-        enqueue("Quelle") { [self] selected in
+        await enqueue("Quelle") { [self] selected in
             let live = try await api.get(selected.endpoint, "/groups/current/sources", as: DSources.self)
             guard live.sources.contains(source), ["opticaljack", "line"].contains(source.type),
-                  source.sourceId.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" }) else { throw RemoteError.unsupported }
+                  !source.sourceId.isEmpty, source.sourceId.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" }) else { throw RemoteError.unsupported }
             try await api.post(selected.endpoint, "/groups/current/sources/\(source.sourceId)/playback/play")
-        }
+        }?.value
     }
     func setNight(_ value: Bool) async {
         guard supportsNight, value != nightMode else { return }   // keine Schreibbefehle ohne echte Änderung
-        enqueue("Nachtmodus") { [self] selected in
+        await enqueue("Nachtmodus") { [self] selected in
             try await api.post(selected.endpoint, "/systems/current/settings/audio/nightMode", body: body(["nightMode": value ? "on" : "off"]))
             nightMode = value
-        }
+        }?.value
     }
     func setEq(_ value: String) async {
         guard supportsEq, eqPresets.contains(value), value != eqPreset else { return }
-        enqueue("Equalizer") { [self] selected in
+        await enqueue("Equalizer") { [self] selected in
             try await api.post(selected.endpoint, "/systems/current/settings/audio/equalizer", body: body(["preset": value]))
             eqPreset = value
-        }
+        }?.value
     }
     func sendCustomEq() {
         guard supportsEq, eqPresets.contains("custom") else { return }
@@ -403,7 +408,7 @@ enum HUD {
         if panel == nil {
             let p = NSPanel(contentRect: .init(x: 0, y: 0, width: 200, height: 170),
                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
-            p.isOpaque = false; p.backgroundColor = .clear; p.level = .screenSaver
+            p.isOpaque = false; p.backgroundColor = .clear; p.level = .statusBar   // über Vollbild-Apps, aber unter Sperrbildschirm und Systemdialogen
             p.ignoresMouseEvents = true; p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             panel = p
         }
@@ -421,6 +426,7 @@ enum HUD {
 
 @MainActor
 enum Hotkeys {
+    private static var refs: [EventHotKeyRef] = []
     static func register() {
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let handlerStatus = InstallEventHandler(GetApplicationEventTarget(), { _, ev, _ in
@@ -437,15 +443,22 @@ enum Hotkeys {
             Phantom.shared.errorMessage = "Globale Tastenkürzel konnten nicht eingerichtet werden (\(handlerStatus))."
             return
         }
-        var failed = false
+        var failed: [String] = []
         let mods = UInt32(controlKey | optionKey)
-        for (id, key) in [(1, kVK_UpArrow), (2, kVK_DownArrow), (3, kVK_ANSI_M)] {
+        for (id, key, name) in [(1, kVK_UpArrow, "⌃⌥↑"), (2, kVK_DownArrow, "⌃⌥↓"), (3, kVK_ANSI_M, "⌃⌥M")] {
             var ref: EventHotKeyRef?
             let status = RegisterEventHotKey(UInt32(key), mods, EventHotKeyID(signature: OSType(0x44564C54), id: UInt32(id)),
                                 GetApplicationEventTarget(), 0, &ref)
-            if status != noErr { failed = true }
+            if status == noErr, let ref { refs.append(ref) } else { failed.append(name) }
         }
-        if failed { Phantom.shared.errorMessage = "Mindestens ein globales Tastenkürzel ist bereits belegt. Die Fensterbedienung funktioniert weiterhin." }
+        if !failed.isEmpty {
+            Phantom.shared.errorMessage = "Bereits von einer anderen App belegt: \(failed.joined(separator: ", ")). Die übrigen Kürzel und die Fensterbedienung funktionieren."
+        }
+    }
+    /// Registrierte Kürzel wieder freigeben (beim Beenden).
+    static func unregister() {
+        refs.forEach { UnregisterEventHotKey($0) }
+        refs.removeAll()
     }
 }
 

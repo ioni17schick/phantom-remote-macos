@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.1-beta — 2026-11-22
+
+Korrekturen nach einem externen KI-Code-Review (Grok); jede Korrektur hat einen Regressionstest, der ohne sie fehlschlägt.
+
+- Lautstärke, Stummschaltung, Wiedergabe, Quelle, Nachtmodus und EQ: `await` kehrt erst zurück, wenn der Befehl wirklich abgeschlossen ist (vorher nur „eingereiht“).
+- „Von Quelle/Firmware nicht unterstützt“ wird von Verbindungsfehlern getrennt: Meldung ja, aber kein Offline-Zustand und keine verworfenen Folgebefehle.
+- Verbindungsverlust beim Abfragen erscheint jetzt auch als Fehlerhinweis, nicht nur im Statustext.
+- Fensterhöhe folgt dem Inhalt, höchstens bis zur Bildschirmhöhe; darüber wird gescrollt.
+- Lautstärke-Einblendung auf Statusleisten-Ebene statt Bildschirmschoner-Ebene.
+- Globale Tastenkürzel werden beim Beenden abgemeldet; bei Belegung nennt die Meldung die betroffenen Kürzel.
+- Leere Quellen-IDs vom Gerät werden nicht mehr als Befehl gesendet.
+- 67 Regressionstests.
+
 ## 0.1.0-beta — 2026-11-22
 
 Erste zur öffentlichen Prüfung vorbereitete Version; noch kein veröffentlichtes Release.

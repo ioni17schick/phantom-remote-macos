@@ -4,6 +4,10 @@ actor MockTransport: RemoteTransport {
     var actualVolume = 35
     var night = false
     var mutedState = false
+    var offerEmptySource = false
+    var failReads = false
+    func setEmptySource(_ on: Bool) { offerEmptySource = on }
+    func setFailReads(_ on: Bool) { failReads = on }
     var failPosts = false
     var identity = "leader-a"
     var systemID = "system-a"
@@ -46,6 +50,7 @@ actor MockTransport: RemoteTransport {
             if path.hasSuffix("/playback/mute") { mutedState = true }
             if path.hasSuffix("/playback/unmute") { mutedState = false }
         } else {
+            if failReads { return (Data("{}".utf8), 500) }
             switch path {
             case "/devices/current": object = ["deviceId": deviceID, "deviceName": secondary ? "Right" : "Left", "systemId": systemID, "isSystemLeader": !secondary, "model": "Phantom 95 dB", "role": secondary ? "FrontRight" : "FrontLeft"]
             case "/systems/current": object = ["systemId": systemID, "systemName": "Test Pair", "systemType": "stereo", "devices": [["deviceId": identity, "deviceName": "Left", "role": "FrontLeft", "isSystemLeader": true], ["deviceId": "follower-a", "deviceName": "Right", "role": "FrontRight", "isSystemLeader": false]]]
@@ -57,7 +62,10 @@ actor MockTransport: RemoteTransport {
                     delaySnapshots = false; snapshotStarted = true
                     try await Task.sleep(for: .milliseconds(200))
                 }
-            case "/groups/current/sources": object = ["sources": [["sourceId": "optical-right", "deviceId": "follower-a", "type": "opticaljack"], ["sourceId": "optical-left", "deviceId": identity, "type": "opticaljack"], ["sourceId": "airplay", "deviceId": identity, "type": "airplay2"]]]
+            case "/groups/current/sources":
+                var list: [[String: Any]] = [["sourceId": "optical-right", "deviceId": "follower-a", "type": "opticaljack"], ["sourceId": "optical-left", "deviceId": identity, "type": "opticaljack"], ["sourceId": "airplay", "deviceId": identity, "type": "airplay2"]]
+                if offerEmptySource { list.append(["sourceId": "", "deviceId": identity, "type": "opticaljack"]) }
+                object = ["sources": list]
             case "/systems/current/settings/audio/nightMode": object = ["nightMode": night ? "on" : "off"]; status = optionalAvailable ? 200 : 404
             case "/systems/current/settings/audio/equalizer": object = ["preset": "flat", "availablePresets": ["flat", "voice", "custom"], "gainRange": ["min": -6, "max": 6], "customEqualization": ["low": ["gain": 0], "high": ["gain": 0]]]; status = optionalAvailable ? 200 : 404
             case "/systems/current/settings/audio/balance": object = ["balance": 0]; status = optionalAvailable ? 200 : 404
@@ -209,6 +217,35 @@ actor MockTransport: RemoteTransport {
         await forgetApp.step(3, hud: false); await forgetApp.waitUntilIdle()
         let forgetCount = await forgetMock.count()
         expect(forgetCount == 0 && forgetApp.target == nil, "forgotten system receives no command")
+        // --- Review-Korrekturen: ehrliche async-Funktionen, getrennte Fehlerarten ---
+        let (asyncApp, asyncMock, _) = try await fixture()
+        await asyncApp.step(3, hud: false)          // bewusst OHNE waitUntilIdle()
+        let levelAfterAwait = await asyncMock.level()
+        expect(levelAfterAwait == 38 && asyncApp.volume == 38, "await step() returns after the command completed")
+        await asyncApp.toggleMute(hud: false)
+        expect(asyncApp.muted, "await toggleMute() returns after the command completed")
+
+        let (unsupApp, unsupMock, _) = try await fixture()
+        // Mock bietet nur "play" an, spielt aber → "pause" fehlt. Der danach eingereihte Lautstärkebefehl
+        // darf deshalb NICHT verworfen werden (nur echte Verbindungsfehler verwerfen die Warteschlange).
+        async let pauseAttempt: Void = unsupApp.playPause()
+        async let followUp: Void = unsupApp.step(3, hud: false)
+        _ = await (pauseAttempt, followUp)
+        let followUpLevel = await unsupMock.level()
+        expect(followUpLevel == 38, "unsupported command does not drop the next queued command")
+        expect(unsupApp.online, "unsupported command keeps the connection online")
+        expect(unsupApp.errorMessage?.contains("nicht angeboten") == true, "unsupported command shows a clear message")
+
+        let (emptyApp, emptyMock, _) = try await fixture()
+        await emptyMock.setEmptySource(true); await emptyApp.refresh()
+        let before = await emptyMock.count()
+        if let empty = emptyApp.sources.first(where: { $0.sourceId.isEmpty }) { await emptyApp.select(empty) }
+        let afterEmpty = await emptyMock.count()
+        expect(emptyApp.sources.contains(where: { $0.sourceId.isEmpty }) && afterEmpty == before, "empty source ID from the device is never posted")
+
+        let (lostApp, lostMock, _) = try await fixture()
+        await lostMock.setFailReads(true); await lostApp.refresh()
+        expect(!lostApp.online && lostApp.errorMessage?.contains("Verbindung") == true, "losing the connection while reading is shown in the banner")
         print("\(checks) checks passed. Mock transport only; no physical devices contacted.")
     }
 }

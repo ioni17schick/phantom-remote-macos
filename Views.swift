@@ -143,8 +143,17 @@ struct ErrorBanner: View {
         }
     }
 }
+/// Gemessene Inhaltshöhe des Hauptfensters
+@MainActor final class ContentHeight: ObservableObject { @Published var value: CGFloat = 760 }
+private struct ContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
 struct MainView: View {
     @ObservedObject var p = Phantom.shared
+    @StateObject private var height = ContentHeight()
+    /// Fenster nie höher als der sichtbare Bildschirm; darüber hinaus wird gescrollt.
+    private var maxHeight: CGFloat { (NSScreen.main?.visibleFrame.height ?? 900) - 40 }
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
@@ -189,10 +198,11 @@ struct MainView: View {
                     Button("Verbindung prüfen") { Task { await p.refresh() } }.disabled(p.busy || p.target == nil).controlSize(.small)
                 }
             }.padding(26)
+            .background(GeometryReader { g in Color.clear.preference(key: ContentHeightKey.self, value: g.size.height) })
         }
-        // Höhe folgt dem Inhalt (Fehlerbanner, Gerätezahl), damit die Fußzeile nie abgeschnitten wird
-        .frame(width: 780)
-        .fixedSize(horizontal: false, vertical: true)
+        .onPreferenceChange(ContentHeightKey.self) { h in Task { @MainActor in if h > 0 { height.value = h } } }
+        // Höhe folgt dem Inhalt (Fehlerbanner, Gerätezahl), höchstens Bildschirmhöhe – dann scrollt das Fenster
+        .frame(width: 780, height: min(height.value, maxHeight))
         .foregroundStyle(.white).environment(\.colorScheme, .dark)
         .background(LinearGradient(colors: [.bgTop, .bgBottom], startPoint: .top, endPoint: .bottom))
         .sheet(isPresented: $p.deviceSheet) { DevicesView(p: p) }
