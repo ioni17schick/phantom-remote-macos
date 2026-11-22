@@ -21,7 +21,7 @@ Es gab bislang **kein unabhängiges menschliches Code-Audit**. Automatisierte Te
 - Frei veränderbares Fenster: klein nur das Lautstärkerad, normal die volle Steuerung, groß bzw. im Vollbild eine „Now Playing“-Ansicht mit Titel, Quelle und großen Zurück/Play/Weiter-Knöpfen (sofern die Quelle sie anbietet).
 - Menüleistensteuerung und globale Kürzel: **⌃⌥↑**, **⌃⌥↓**, **⌃⌥M**.
 - Sichtbare Fehlermeldungen. Fehlgeschlagene Befehle werden nicht als erfolgreich bestätigt.
-- Update-Prüfung per Knopf (Fußzeile oder App-Menü „Nach Updates suchen …“), optional täglich automatisch. Sie öffnet bei einer neuen Version nur die Release-Seite; die App installiert nichts selbst, weil sie nicht notarisiert ist.
+- Update-Prüfung per Knopf (Fußzeile oder App-Menü „Nach Updates suchen …“), optional täglich automatisch. Ab 0.1.4 installiert **„Update installieren“** die neue Version direkt in der App und startet neu – nur auf Knopfdruck, nie still im Hintergrund (Details unter „Selbst-Update“).
 
 ## Voraussetzungen und getesteter Umfang
 
@@ -49,6 +49,17 @@ gh attestation verify Phantom-Remote-*-unsigned.zip --repo ioni17schick/phantom-
 3. Ab dann startet die App normal.
 
 Das ist eine bewusste Ausnahme von macOS-Schutzmechanismen. Nur machen, wenn du dem Projekt vertraust; sonst die App wie unten beschrieben selbst bauen – selbst gebaute Apps sind davon nicht betroffen.
+
+## Selbst-Update
+
+„Update installieren“ lädt das Release-Zip dieses Repositorys von GitHub, prüft es und ersetzt die laufende App:
+
+1. Nur Downloads unter `github.com/ioni17schick/phantom-remote-macos/releases/download/…`; Weiterleitungen nur zu `*.githubusercontent.com`, nur HTTPS.
+2. SHA-256 muss zur `.sha256`-Datei desselben Releases passen.
+3. Das Archiv muss genau eine App mit der Kennung `org.phantomremote.mac`, der erwarteten Version und gültiger Code-Signatur enthalten.
+4. Die bisherige Version wird in den **Papierkorb** gelegt (wiederherstellbar); schlägt der Austausch fehl, wird sie automatisch zurückgelegt.
+
+**Bewusster Kompromiss:** Eine von der App selbst geladene Datei trägt keine Quarantäne-Markierung, macOS fragt danach also nicht nach „Trotzdem öffnen“. Die Prüfungen schützen vor fehlerhaften Downloads und fremden Servern, **nicht** vor einem kompromittierten GitHub-Konto dieses Projekts. Wer das nicht möchte, nutzt den Safari-Knopf daneben (Release-Seite) oder baut selbst. Startet die App aus einem schreibgeschützten Ort (z. B. direkt aus „Downloads“), bietet sie nur den Download an.
 
 ## Bauen und starten
 
@@ -117,7 +128,7 @@ Diese App ist eine **Fernbedienung, kein Audiotreiber**. Für Ton vom Mac den La
 
 ## Datenschutz
 
-Keine Telemetrie, kein Cloudkonto und kein Download von Produktgrafiken. Die App kontaktiert die lokal entdeckten oder von dir eingegebenen Geräte. Einzige Ausnahme ist die **Update-Prüfung**: Sie fragt die öffentliche GitHub-API nach Releases dieses Projekts ab – nur auf Knopfdruck oder, wenn du es unter **Geräte …** einschaltest, höchstens einmal täglich beim Start (standardmäßig aus). Gesendet wird dabei nur `PhantomRemote/<Version>` als User-Agent; GitHub sieht wie bei jedem Abruf deine IP-Adresse. Gespeichert werden das ausgewählte System, Geräte-IDs, Adressen und das Lautstärkelimit in macOS-UserDefaults (`org.phantomremote.mac`). Keine Gerätekennungen oder privaten Netzadressen sind im Quellcode voreingestellt. Seriennummern können in Geräteantworten enthalten sein, werden aber nicht als Adressen zusammengesetzt oder in der Konfiguration gespeichert.
+Keine Telemetrie, kein Cloudkonto und kein Download von Produktgrafiken. Die App kontaktiert die lokal entdeckten oder von dir eingegebenen Geräte. Einzige Ausnahme sind **Update-Prüfung und Selbst-Update**: Sie fragt die öffentliche GitHub-API nach Releases dieses Projekts ab – nur auf Knopfdruck oder, wenn du es unter **Geräte …** einschaltest, höchstens einmal täglich beim Start (standardmäßig aus). Gesendet wird dabei nur `PhantomRemote/<Version>` als User-Agent; GitHub sieht wie bei jedem Abruf deine IP-Adresse. Gespeichert werden das ausgewählte System, Geräte-IDs, Adressen und das Lautstärkelimit in macOS-UserDefaults (`org.phantomremote.mac`). Keine Gerätekennungen oder privaten Netzadressen sind im Quellcode voreingestellt. Seriennummern können in Geräteantworten enthalten sein, werden aber nicht als Adressen zusammengesetzt oder in der Konfiguration gespeichert.
 
 Fehlerberichte und Screenshots bitte vor Veröffentlichung auf private Namen, IDs und Adressen prüfen.
 

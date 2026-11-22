@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.4-beta — 2026-11-22
+
+- Selbst-Update: „Update installieren“ lädt, prüft und installiert die neue Version direkt in der App und startet neu (nur auf Knopfdruck).
+- Prüfungen: nur Assets dieses Repositorys, Weiterleitung nur zu GitHub-Speicher, SHA-256, Bundle-ID, Version, Code-Signatur.
+- Alte Version landet im Papierkorb; misslingt der Austausch, wird sie zurückgelegt.
+- Kein Selbst-Update aus schreibgeschützten Orten (App Translocation) oder für Entwicklerversionen – dann Release-Seite.
+- README/SECURITY: Kompromiss (keine Gatekeeper-Nachfrage) offen beschrieben.
+- 110 Regressionstests, u. a. mit einer echten signierten Test-App (gültig, falsche Prüfsumme, fremde App, falsche Version, manipulierter Code).
+
 ## 0.1.3-beta — 2026-11-22
 
 - Fenster frei in der Größe veränderbar, inklusive Vollbild.

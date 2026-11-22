@@ -478,11 +478,24 @@ struct UpdateStatusView: View {
                     .onTapGesture { Task { await u.check() } }
                     .help("Klicken, um erneut zu prüfen")
             case .available(let version, let page):
-                Button { NSWorkspace.shared.open(page) } label: {
-                    Label("Update \(version) – Herunterladen", systemImage: "arrow.down.circle.fill")
+                if u.canSelfUpdate {
+                    Button { Task { await u.install() } } label: {
+                        Label("Update \(version) installieren", systemImage: "arrow.down.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent).tint(.accentWarm).foregroundStyle(.black)
+                    .help("Lädt das Update von GitHub, prüft es, legt die alte Version in den Papierkorb und startet neu.")
+                    Button { NSWorkspace.shared.open(page) } label: { Image(systemName: "safari") }
+                        .buttonStyle(.plain).foregroundStyle(.secondary).help("Release-Seite mit Änderungen öffnen")
+                } else {
+                    Button { NSWorkspace.shared.open(page) } label: {
+                        Label("Update \(version) – Herunterladen", systemImage: "arrow.down.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent).tint(.accentWarm).foregroundStyle(.black)
+                    .help(u.selfUpdateBlocker ?? "Dieses Release enthält keinen prüfbaren Download – öffnet die Release-Seite.")
                 }
-                .buttonStyle(.borderedProminent).tint(.accentWarm).foregroundStyle(.black)
-                .help("Öffnet die Release-Seite auf GitHub. Die App installiert nichts selbst.")
+            case .installing(let step):
+                ProgressView().controlSize(.small)
+                Text(step).foregroundStyle(Color.accentWarm)
             case .failed(let message):
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).help(message)
                 Button("Erneut prüfen") { Task { await u.check() } }.help(message)
@@ -507,9 +520,11 @@ struct MenuUpdateHint: View {
     @ObservedObject var u = UpdateChecker.shared
     var body: some View {
         if case .available(let version, let page) = u.state {
-            Button { NSWorkspace.shared.open(page) } label: {
-                Label("Update \(version) verfügbar", systemImage: "arrow.down.circle.fill")
+            Button { if u.canSelfUpdate { Task { await u.install() } } else { NSWorkspace.shared.open(page) } } label: {
+                Label(u.canSelfUpdate ? "Update \(version) installieren" : "Update \(version) verfügbar", systemImage: "arrow.down.circle.fill")
             }.tint(.accentWarm)
+        } else if case .installing(let step) = u.state {
+            Label(step, systemImage: "arrow.down.circle").foregroundStyle(Color.accentWarm)
         }
     }
 }

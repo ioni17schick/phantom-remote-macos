@@ -87,6 +87,27 @@ actor GitHubMock: RemoteTransport {
     func send(_ request: URLRequest) async throws -> (Data, Int) { requests.append(request); return (Data(body.utf8), status) }
 }
 
+
+/// Baut eine kleine, ad hoc signierte Test-App und packt sie wie das Release-Zip.
+func makeFakeRelease(in dir: URL, bundleID: String, version: String, tamper: Bool = false) throws -> URL {
+    let fm = FileManager.default
+    let src = dir.appendingPathComponent("src-\(UUID().uuidString)")
+    let app = src.appendingPathComponent("Phantom Remote.app")
+    try fm.createDirectory(at: app.appendingPathComponent("Contents/MacOS"), withIntermediateDirectories: true)
+    let plist: NSDictionary = ["CFBundleIdentifier": bundleID, "CFBundleShortVersionString": version,
+                               "CFBundleExecutable": "PhantomRemote", "CFBundlePackageType": "APPL"]
+    plist.write(to: app.appendingPathComponent("Contents/Info.plist"), atomically: true)
+    try fm.copyItem(at: URL(fileURLWithPath: "/usr/bin/true"), to: app.appendingPathComponent("Contents/MacOS/PhantomRemote"))
+    _ = try SelfUpdate.run("/usr/bin/codesign", ["--force", "--sign", "-", app.path])
+    if tamper {   // nach dem Signieren verändern → Signatur muss ungültig sein
+        let bin = app.appendingPathComponent("Contents/MacOS/PhantomRemote")
+        var data = try Data(contentsOf: bin); data.append(0x00); try data.write(to: bin)
+    }
+    let zip = dir.appendingPathComponent("release-\(UUID().uuidString).zip")
+    _ = try SelfUpdate.run("/usr/bin/ditto", ["-c", "-k", "--keepParent", app.path, zip.path])
+    return zip
+}
+
 @main struct RegressionTests {
     @MainActor static var checks = 0
     @MainActor static func expect(_ condition: Bool, _ label: String) {
@@ -317,6 +338,79 @@ actor GitHubMock: RemoteTransport {
         expect(LayoutMode(width: 780, height: 800) == .regular, "default window size shows the regular view")
         expect(LayoutMode(width: 1099, height: 1000) == .regular, "just below the large threshold stays regular")
         expect(LayoutMode(width: 1440, height: 900) == .large && LayoutMode(width: 1920, height: 1080) == .large, "full screen shows now playing")
+        // --- Selbst-Update: Links, Weiterleitungen, Prüfsumme, Paketprüfung, Austausch ---
+        let dl = "https://github.com/\(repo)/releases/download/v0.2.0-beta/Phantom-Remote-0.2.0-beta-unsigned.zip"
+        expect(UpdateChecker.trustedDownload(dl) != nil, "own release download is trusted")
+        for bad in ["https://github.com/someone/else/releases/download/v1/x.zip", "http://github.com/\(repo)/releases/download/v1/x.zip",
+                    "https://evil.example/\(repo)/releases/download/v1/x.zip", "https://github.com/\(repo)/archive/main.zip"] {
+            expect(UpdateChecker.trustedDownload(bad) == nil, "foreign download rejected: \(bad)")
+        }
+        expect(SafeDownloader.allowedRedirect(URL(string: "https://objects.githubusercontent.com/x")) &&
+               SafeDownloader.allowedRedirect(URL(string: "https://release-assets.githubusercontent.com/x")), "redirect to GitHub storage allowed")
+        for bad in ["http://objects.githubusercontent.com/x", "https://evil.example/x", "https://githubusercontent.com.evil.example/x", "https://evilgithubusercontent.com/x"] {
+            expect(!SafeDownloader.allowedRedirect(URL(string: bad)), "redirect blocked: \(bad)")
+        }
+        let hex = String(repeating: "ab", count: 32)
+        expect(SelfUpdate.parseChecksum("\(hex)  Phantom-Remote.zip\n") == hex, "checksum line is parsed")
+        expect(SelfUpdate.parseChecksum("") == nil && SelfUpdate.parseChecksum("xyz  file") == nil && SelfUpdate.parseChecksum(String(hex.dropLast())) == nil, "invalid checksum lines are rejected")
+
+        let withAssets = """
+        [{"tag_name":"v0.2.0-beta","html_url":"https://github.com/\(repo)/releases/tag/v0.2.0-beta","draft":false,
+          "assets":[{"name":"Phantom-Remote-0.2.0-beta-unsigned.zip","browser_download_url":"\(dl)"},
+                    {"name":"Phantom-Remote-0.2.0-beta-unsigned.zip.sha256","browser_download_url":"\(dl).sha256"}]},
+         {"tag_name":"v0.1.9","html_url":"https://github.com/\(repo)/releases/tag/v0.1.9","draft":false,
+          "assets":[{"name":"Phantom-Remote-0.1.9-unsigned.zip","browser_download_url":"https://evil.example/x.zip"},
+                    {"name":"Phantom-Remote-0.1.9-unsigned.zip.sha256","browser_download_url":"https://evil.example/x.sha256"}]}]
+        """
+        await gh.set(withAssets)
+        let assetChecker = UpdateChecker(current: "0.1.3", transport: gh, defaults: nil)
+        await assetChecker.check()
+        expect(assetChecker.availableAsset == ReleaseAsset(zip: URL(string: dl)!, checksum: URL(string: dl + ".sha256")!), "zip and checksum of the newest release are found")
+        let noAssetChecker = UpdateChecker(current: "0.1.3", transport: gh, defaults: nil)
+        await gh.set(releasesJSON)
+        await noAssetChecker.check()
+        expect(noAssetChecker.availableAsset == nil && !noAssetChecker.canSelfUpdate, "release without checksum offers only the release page")
+
+        let fm = FileManager.default
+        let work = fm.temporaryDirectory.appendingPathComponent("phantom-selfupdate-test-\(UUID().uuidString)")
+        try fm.createDirectory(at: work, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: work) }
+        let bid = UpdateChecker.bundleID, want = AppVersion("0.2.0-beta")!
+        let good = try makeFakeRelease(in: work, bundleID: bid, version: "0.2.0")
+        let goodSHA = try SelfUpdate.sha256(of: good)
+        let staged = try? SelfUpdate.verifyAndStage(zip: good, expectedSHA: goodSHA, expectedVersion: want, bundleID: bid, workDir: work.appendingPathComponent("w1"))
+        expect(staged?.lastPathComponent == "Phantom Remote.app", "valid release passes all checks")
+        func rejects(_ zip: URL, sha: String, _ label: String) {
+            let result = try? SelfUpdate.verifyAndStage(zip: zip, expectedSHA: sha, expectedVersion: want, bundleID: bid, workDir: work.appendingPathComponent(UUID().uuidString))
+            expect(result == nil, label)
+        }
+        rejects(good, sha: String(repeating: "0", count: 64), "wrong checksum is rejected")
+        let other = try makeFakeRelease(in: work, bundleID: "com.example.other", version: "0.2.0")
+        rejects(other, sha: try SelfUpdate.sha256(of: other), "different app in the archive is rejected")
+        let oldVersion = try makeFakeRelease(in: work, bundleID: bid, version: "0.1.0")
+        rejects(oldVersion, sha: try SelfUpdate.sha256(of: oldVersion), "unexpected version in the archive is rejected")
+        let tampered = try makeFakeRelease(in: work, bundleID: bid, version: "0.2.0", tamper: true)
+        rejects(tampered, sha: try SelfUpdate.sha256(of: tampered), "code modified after signing is rejected")
+
+        let installed = work.appendingPathComponent("Applications/Phantom Remote.app")
+        try fm.createDirectory(at: installed, withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: installed.appendingPathComponent("marker"))
+        let fresh = work.appendingPathComponent("fresh.app")
+        try fm.createDirectory(at: fresh, withIntermediateDirectories: true)
+        try Data("new".utf8).write(to: fresh.appendingPathComponent("marker"))
+        let aside = work.appendingPathComponent("trash")
+        try fm.createDirectory(at: aside, withIntermediateDirectories: true)
+        let putAside: (URL) throws -> URL = { old in
+            let dest = aside.appendingPathComponent(UUID().uuidString + ".app"); try fm.moveItem(at: old, to: dest); return dest
+        }
+        try SelfUpdate.replace(current: installed, with: fresh, putAside: putAside)
+        let nowInstalled = try String(contentsOf: installed.appendingPathComponent("marker"), encoding: .utf8)
+        let kept = try fm.contentsOfDirectory(atPath: aside.path).count
+        expect(nowInstalled == "new" && kept == 1, "new version replaces the old one, old one is kept aside")
+        let missing = work.appendingPathComponent("does-not-exist.app")
+        let failed = (try? SelfUpdate.replace(current: installed, with: missing, putAside: putAside)) == nil
+        let restored = (try? String(contentsOf: installed.appendingPathComponent("marker"), encoding: .utf8)) == "new"
+        expect(failed && restored, "failed replacement restores the previous version")
         print("\(checks) checks passed. Mock transport only; no physical devices contacted.")
     }
 }
