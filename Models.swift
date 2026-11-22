@@ -187,3 +187,25 @@ extension LayoutMode {
         }
     }
 }
+
+/// Direkte Berechnung statt Ausprobieren: Maßstab = verfügbare Höhe ÷ gemessene Inhaltshöhe bei Maßstab 1
+/// (begrenzt durch die Breite). Reicht der Platz für die Karten nicht, wird ohne Karten gerechnet.
+struct LayoutFit: Equatable, Sendable {
+    let scale: Double
+    let cards: Bool
+    static let minimumWithCards = 0.72
+    static func choose(_ mode: LayoutMode, width: Double, height: Double, unitWithCards: Double, unitWithoutCards: Double) -> LayoutFit {
+        switch mode {
+        case .compact:
+            return LayoutFit(scale: 1, cards: false)
+        case .regular:
+            let byWidth = min(1.8, max(0.6, width / LayoutMode.regularReference.width))
+            let full = min(byWidth, height / max(1, unitWithCards))
+            if full >= minimumWithCards { return LayoutFit(scale: full, cards: true) }
+            return LayoutFit(scale: max(0.6, min(byWidth, height / max(1, unitWithoutCards))), cards: false)
+        case .large:
+            let byWidth = min(2.2, max(0.6, width / LayoutMode.largeReference.width))
+            return LayoutFit(scale: max(0.6, min(byWidth, height / max(1, unitWithCards))), cards: true)
+        }
+    }
+}

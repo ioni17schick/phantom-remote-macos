@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.6-beta — 2026-11-22
+
+- Skalieren wieder flüssig: Statt bis zu sieben Varianten bei jeder Größenänderung aufzubauen und auszumessen, wird der Maßstab direkt berechnet (verfügbare Höhe ÷ gemessene Inhaltshöhe) – eine einzige Oberfläche.
+- Maßstab in 2,5-%-Stufen: Zwischen zwei Stufen werden Schriften und Formen nicht neu berechnet. Gemessen beim Aufziehen eines Fensters: Median 6,9 ms pro Schritt (0.1.5: 48,6 ms, 0.1.4: 11,3 ms).
+- Darstellungsfehler behoben: Schieberegler blieben als „Geister“ außerhalb der Klang-Karte stehen (Reste verworfener macOS-Regler). Jetzt eigener, mitskalierender Schieberegler.
+- Hinweistexte einzeilig, damit die Messung stabil bleibt.
+- 125 Regressionstests (u. a. „gewählter Maßstab passt immer in die Höhe“).
+
 ## 0.1.5-beta — 2026-11-22
 
 - Kein Scrollen mehr: Die gesamte Oberfläche skaliert mit der Fenstergröße (Schrift, Rad, Lautsprecher, Knöpfe, Karten, Abstände).

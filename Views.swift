@@ -82,6 +82,44 @@ struct ScaledSegments: View {
         .padding(3 * s).background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8 * s))
     }
 }
+/// Schieberegler, der mit der Oberfläche skaliert (der macOS-Regler wächst nicht mit und hinterlässt beim Umbau Reste).
+struct ScaledSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var s: CGFloat
+    let onEditingChanged: (Bool) -> Void
+    @StateObject private var drag = DragState()
+    var body: some View {
+        GeometryReader { g in
+            let knob = 18 * s
+            let track = max(1, g.size.width - knob)
+            let span = max(1, range.upperBound - range.lowerBound)
+            let fraction = CGFloat(min(1, max(0, (value - range.lowerBound) / span)))
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.white.opacity(0.15)).frame(height: 4 * s)
+                Capsule().fill(Color.accentWarm).frame(width: knob / 2 + track * fraction, height: 4 * s)
+                Circle().fill(.white).frame(width: knob, height: knob).shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
+                    .offset(x: track * fraction)
+            }
+            .frame(width: g.size.width, height: g.size.height)
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0)
+                .onChanged { v in
+                    if drag.start == nil { drag.start = value; onEditingChanged(true) }
+                    let f = min(1, max(0, (v.location.x - knob / 2) / track))
+                    value = (range.lowerBound + Double(f) * span).rounded()
+                }
+                .onEnded { _ in drag.start = nil; onEditingChanged(false) })
+        }
+        .frame(height: 22 * s)
+        .accessibilityElement()
+        .accessibilityValue("\(Int(value))")
+        .accessibilityAdjustableAction { direction in
+            value = min(range.upperBound, max(range.lowerBound, value + (direction == .increment ? 1 : -1)))
+            onEditingChanged(true); onEditingChanged(false)
+        }
+    }
+}
 struct RoundIconButton: View {
     let icon: String
     var size: CGFloat = 40
@@ -231,19 +269,44 @@ struct ErrorBanner: View {
 /// Wie ausführlich die Karten sein dürfen, damit alles ohne Scrollen passt.
 enum CardDetail { case full, condensed, none }
 
+/// Gemessene Inhaltshöhe je Ansicht bei Maßstab 1 – daraus wird der Maßstab direkt berechnet.
+@MainActor final class FitStore: ObservableObject {
+    @Published private(set) var units: [String: CGFloat] = [:]
+    private static let initial: [String: CGFloat] = ["regular.cards": 700, "regular.reduced": 440, "large.cards": 640]
+    static func key(_ mode: LayoutMode, cards: Bool) -> String { "\(mode).\(cards ? "cards" : "reduced")" }
+    func unit(_ mode: LayoutMode, cards: Bool) -> Double {
+        let k = Self.key(mode, cards: cards)
+        return Double(units[k] ?? Self.initial[k] ?? 700)
+    }
+    /// Nur echte Änderungen übernehmen (> 1,5 %), damit Messen und Skalieren sich nicht gegenseitig anstoßen.
+    func record(_ key: String, unitHeight: CGFloat) {
+        guard unitHeight.isFinite, unitHeight > 80 else { return }
+        if let old = units[key], abs(old - unitHeight) / old < 0.015 { return }
+        units[key] = unitHeight
+    }
+}
+private struct NaturalHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 struct MainView: View {
     @ObservedObject var p = Phantom.shared
+    @StateObject private var fit = FitStore()
     var body: some View {
         GeometryReader { geo in
             let mode = LayoutMode(width: geo.size.width, height: geo.size.height)
-            let s = CGFloat(LayoutMode.scale(mode, width: geo.size.width, height: geo.size.height))
+            let choice = LayoutFit.choose(mode, width: geo.size.width, height: geo.size.height,
+                                          unitWithCards: fit.unit(mode, cards: true), unitWithoutCards: fit.unit(mode, cards: false))
+            // In 2,5-%-Stufen: zwischen zwei Stufen bleiben Schriften und Formen unverändert → flüssiges Ziehen.
+            let s = CGFloat((choice.scale / 0.025).rounded(.down) * 0.025)
             Group {
                 if !p.everConnected { welcome }
                 else {
                     switch mode {
                     case .compact: compact(geo.size)
-                    case .regular: regular(s)
-                    case .large: large(s)
+                    case .regular: measured(regularBody(s, cards: choice.cards ? .full : .none), key: FitStore.key(mode, cards: choice.cards), s: s)
+                    case .large: measured(largeBody(s, cards: .full, speakers: true), key: FitStore.key(mode, cards: true), s: s)
                     }
                 }
             }
@@ -279,20 +342,16 @@ struct MainView: View {
         .padding(.horizontal, 18).padding(.top, 30).padding(.bottom, 18)
     }
 
-    // MARK: Normal – alles skaliert; wird es knapp, fallen erst Hinweise, dann Karten weg
-    func regular(_ s: CGFloat) -> some View {
-        // Erst schrittweise verkleinern, dann Hinweise weglassen, erst ganz zuletzt die Karten.
-        ViewThatFits(in: .vertical) {
-            regularBody(s, cards: .full)
-            regularBody(s * 0.92, cards: .full)
-            regularBody(s * 0.92, cards: .condensed)
-            regularBody(s * 0.84, cards: .condensed)
-            regularBody(max(0.7, s * 0.76), cards: .condensed)
-            regularBody(s, cards: .none)
-            compact(CGSize(width: 400 * s, height: 420 * s))
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    /// Inhalt in natürlicher Höhe anzeigen, Höhe messen (für die nächste Berechnung) und mittig platzieren.
+    func measured<V: View>(_ content: V, key: String, s: CGFloat) -> some View {
+        content
+            .fixedSize(horizontal: false, vertical: true)
+            .background(GeometryReader { g in Color.clear.preference(key: NaturalHeightKey.self, value: g.size.height) })
+            .onPreferenceChange(NaturalHeightKey.self) { h in Task { @MainActor in fit.record(key, unitHeight: h / max(s, 0.01)) } }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    // MARK: Normal – alles skaliert mit einem Faktor
     func regularBody(_ s: CGFloat, cards: CardDetail) -> some View {
         VStack(spacing: 16 * s) {
             header(s)
@@ -311,30 +370,15 @@ struct MainView: View {
                     sound(s, detail: cards)
                 }.disabled(!p.canControl)
             }
-            Spacer(minLength: 0)   // übriger Platz unten; Fußzeile bleibt am Rand
             footer(s)
         }
         .padding(.horizontal, 24 * s).padding(.top, 28 * s).padding(.bottom, 18 * s)
-        .frame(maxHeight: .infinity)
-        .environment(\.uiScale, s)   // Karten, Lautsprecher usw. im selben Maßstab wie diese Variante
     }
 
     // MARK: Groß / Vollbild – drei Spalten, alles auf einem Bildschirm
-    func large(_ s: CGFloat) -> some View {
-        ViewThatFits(in: .vertical) {
-            largeBody(s, cards: .full, speakers: true)
-            largeBody(s * 0.92, cards: .full, speakers: true)
-            largeBody(s * 0.92, cards: .condensed, speakers: true)
-            largeBody(s * 0.84, cards: .condensed, speakers: true)
-            largeBody(s * 0.84, cards: .condensed, speakers: false)
-            largeBody(max(0.7, s * 0.76), cards: .none, speakers: false)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
     func largeBody(_ s: CGFloat, cards: CardDetail, speakers: Bool) -> some View {
         VStack(spacing: 26 * s) {
             header(s)
-            Spacer(minLength: 0)
             HStack(alignment: .center, spacing: 36 * s) {
                 nowPlaying(s).frame(maxWidth: .infinity)
                 VStack(spacing: 18 * s) {
@@ -349,12 +393,9 @@ struct MainView: View {
                     }.frame(maxWidth: .infinity).disabled(!p.canControl)
                 }
             }
-            Spacer(minLength: 0)
             footer(s)
         }
         .padding(.horizontal, 40 * s).padding(.top, 34 * s).padding(.bottom, 22 * s)
-        .frame(maxHeight: .infinity)
-        .environment(\.uiScale, s)
     }
 
     /// Große Wiedergabe-Ansicht: Quelle, Titel, Interpret, Format und Transport-Buttons.
@@ -387,7 +428,7 @@ struct MainView: View {
             }.disabled(!p.canControl)
             if !canPrevious && !canNext && !canPlayPause {
                 Text("\(info.label): Wiedergabe am Zuspieler steuern – diese Quelle bietet keine Fernsteuerung.")
-                    .font(.system(size: 11 * s)).foregroundStyle(.secondary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                    .font(.system(size: 11 * s)).foregroundStyle(.secondary).multilineTextAlignment(.center).lineLimit(2).minimumScaleFactor(0.7)
             }
         }
     }
@@ -466,7 +507,7 @@ struct MainView: View {
             }
             Button("Mac per AirPlay verbinden …") { p.openAirPlaySettings() }.buttonStyle(ScaledPillStyle(s: s))
             if detail == .full {
-                Text("Spotify, Bluetooth, Roon und UPnP werden vom jeweiligen Zuspieler gestartet.").font(.system(size: 10 * s)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                Text("Spotify, Bluetooth, Roon und UPnP werden vom jeweiligen Zuspieler gestartet.").font(.system(size: 10 * s)).foregroundStyle(.secondary).lineLimit(1).minimumScaleFactor(0.6)
             }
         }.frame(minWidth: 0, maxWidth: .infinity)
     }
@@ -496,7 +537,7 @@ struct MainView: View {
     func adjustment(_ s: CGFloat, _ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, action: @escaping () -> Void) -> some View {
         VStack(spacing: 3 * s) {
             HStack { Text(title); Spacer(); Text("\(Int(value.wrappedValue)) \(unit)").monospacedDigit().foregroundStyle(.secondary) }.font(.system(size: 11 * s))
-            Slider(value: value, in: range, step: 1, onEditingChanged: { editing in if editing { p.beginDrag() } else { action(); p.endDrag() } }).tint(.accentWarm)
+            ScaledSlider(value: value, range: range, s: s) { editing in if editing { p.beginDrag() } else { action(); p.endDrag() } }
         }
     }
     func presetOrder(_ value: String) -> Int { ["flat": 0, "voice": 1, "custom": 2][value] ?? 9 }

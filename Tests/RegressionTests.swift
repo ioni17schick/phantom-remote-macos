@@ -420,6 +420,22 @@ func makeFakeRelease(in dir: URL, bundleID: String, version: String, tamper: Boo
         expect(LayoutMode.scale(.large, width: 2560, height: 1440) == min(2560.0 / lr.width, 1440.0 / lr.height), "large screens scale up proportionally")
         expect(LayoutMode.scale(.large, width: 9000, height: 9000) == 2.2, "scale has an upper bound")
         expect(LayoutMode.scale(.large, width: 1512, height: 945) > 1.1, "MacBook full screen uses the available space")
+        // --- Direkte Maßstabsberechnung (ersetzt das Ausprobieren mehrerer Varianten) ---
+        let fitRef = LayoutFit.choose(.regular, width: 780, height: 700, unitWithCards: 700, unitWithoutCards: 440)
+        expect(abs(fitRef.scale - 1) < 0.0001 && fitRef.cards, "content height equals window height → scale 1 with cards")
+        let fitTall = LayoutFit.choose(.regular, width: 780, height: 1400, unitWithCards: 700, unitWithoutCards: 440)
+        expect(abs(fitTall.scale - 1) < 0.0001, "taller window alone is limited by width, nothing overflows sideways")
+        let fitBig = LayoutFit.choose(.regular, width: 1092, height: 980, unitWithCards: 700, unitWithoutCards: 440)
+        expect(abs(fitBig.scale - 1.4) < 0.0001 && fitBig.cards, "bigger window scales up to fill the height")
+        let fitFlat = LayoutFit.choose(.regular, width: 1000, height: 480, unitWithCards: 700, unitWithoutCards: 440)
+        expect(!fitFlat.cards && fitFlat.scale * 440 <= 480 + 0.001, "too little height for cards → cards hidden, rest still fits")
+        for (w, h) in [(700.0, 620.0), (900.0, 700.0), (1050.0, 1000.0)] {
+            let c = LayoutFit.choose(.regular, width: w, height: h, unitWithCards: 700, unitWithoutCards: 440)
+            let needed = c.scale * (c.cards ? 700 : 440)
+            expect(needed <= h + 0.001 || c.scale == 0.6, "chosen scale always fits the height: \(Int(w))×\(Int(h))")
+        }
+        let fitLarge = LayoutFit.choose(.large, width: 1512, height: 945, unitWithCards: 640, unitWithoutCards: 640)
+        expect(fitLarge.cards && fitLarge.scale * 640 <= 945 + 0.001 && fitLarge.scale > 1.1, "full screen fills the height without overflowing")
         print("\(checks) checks passed. Mock transport only; no physical devices contacted.")
     }
 }
