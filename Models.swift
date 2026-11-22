@@ -171,3 +171,19 @@ enum LayoutMode: Equatable, Sendable {
         else { self = .regular }
     }
 }
+
+extension LayoutMode {
+    /// Bezugsgrößen, in denen die jeweilige Ansicht im Maßstab 1 genau passt.
+    static let regularReference = (width: 780.0, height: 720.0)
+    static let largeReference = (width: 1300.0, height: 780.0)
+    /// Gemeinsamer Skalierungsfaktor für Schrift, Rad, Lautsprecher, Abstände – folgt der knapperen Achse.
+    static func scale(_ mode: LayoutMode, width: Double, height: Double) -> Double {
+        switch mode {
+        case .compact: return 1
+        case .regular:
+            return min(1.6, max(0.75, min(width / regularReference.width, height / regularReference.height)))
+        case .large:
+            return min(2.2, max(0.8, min(width / largeReference.width, height / largeReference.height)))
+        }
+    }
+}

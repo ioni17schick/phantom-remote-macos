@@ -6,17 +6,80 @@ extension Color {
     static let bgBottom = Color(red: 0.025, green: 0.025, blue: 0.03)
     static let accentWarm = Color(red: 0.93, green: 0.80, blue: 0.62)
 }
+/// Gemeinsamer Skalierungsfaktor der Oberfläche (aus der Fenstergröße, siehe LayoutMode.scale).
+struct UIScaleKey: EnvironmentKey { static let defaultValue: CGFloat = 1 }
+extension EnvironmentValues {
+    var uiScale: CGFloat { get { self[UIScaleKey.self] } set { self[UIScaleKey.self] = newValue } }
+}
 struct Card<Content: View>: View {
     let title: String
     @ViewBuilder var content: Content
+    @Environment(\.uiScale) private var s
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(title.uppercased()).font(.system(size: 10.5, weight: .semibold)).tracking(1.6).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 12 * s) {
+            Text(title.uppercased()).font(.system(size: 10.5 * s, weight: .semibold)).tracking(1.6 * s).foregroundStyle(.secondary)
             content
         }
-        .padding(18).frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(.white.opacity(0.08)))
+        .padding(16 * s).frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 18 * s))
+        .overlay(RoundedRectangle(cornerRadius: 18 * s).stroke(.white.opacity(0.08)))
+    }
+}
+/// Knopf, der mit der Oberfläche skaliert (macOS-Standardknöpfe wachsen nicht mit).
+struct ScaledPillStyle: ButtonStyle {
+    var s: CGFloat
+    var prominent = false
+    @Environment(\.isEnabled) private var enabled
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12 * s, weight: prominent ? .semibold : .medium))
+            .padding(.horizontal, 11 * s).padding(.vertical, 5 * s)
+            .foregroundStyle(prominent ? Color.black : Color.white)
+            .background(prominent ? Color.accentWarm : Color.white.opacity(configuration.isPressed ? 0.2 : 0.1),
+                        in: RoundedRectangle(cornerRadius: 7 * s))
+            .opacity(enabled ? 1 : 0.4)
+    }
+}
+/// Schalter, der mit der Oberfläche skaliert.
+struct ScaledSwitch: View {
+    let title: String
+    let isOn: Bool
+    var s: CGFloat
+    let set: (Bool) -> Void
+    var body: some View {
+        Button { set(!isOn) } label: {
+            HStack {
+                Text(title).font(.system(size: 13 * s))
+                Spacer(minLength: 8 * s)
+                ZStack(alignment: isOn ? .trailing : .leading) {
+                    Capsule().fill(isOn ? Color.accentWarm : Color.white.opacity(0.18)).frame(width: 38 * s, height: 22 * s)
+                    Circle().fill(.white).frame(width: 18 * s, height: 18 * s).padding(.horizontal, 2 * s).shadow(radius: 1)
+                }.animation(.easeInOut(duration: 0.15), value: isOn)
+            }.contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title).accessibilityValue(isOn ? "an" : "aus")
+    }
+}
+/// Auswahl als Segmente, skaliert mit.
+struct ScaledSegments: View {
+    let options: [(id: String, label: String)]
+    let selected: String
+    var s: CGFloat
+    let choose: (String) -> Void
+    var body: some View {
+        HStack(spacing: 3 * s) {
+            ForEach(options, id: \.id) { option in
+                Button { choose(option.id) } label: {
+                    Text(option.label).font(.system(size: 12 * s, weight: option.id == selected ? .semibold : .regular))
+                        .frame(maxWidth: .infinity).padding(.vertical, 5 * s)
+                        .foregroundStyle(option.id == selected ? Color.black : Color.white)
+                        .background(option.id == selected ? Color.accentWarm : Color.clear, in: RoundedRectangle(cornerRadius: 6 * s))
+                        .contentShape(Rectangle())
+                }.buttonStyle(.plain)
+            }
+        }
+        .padding(3 * s).background(Color.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 8 * s))
     }
 }
 struct RoundIconButton: View {
@@ -110,25 +173,46 @@ struct VolumeDial: View {
 struct SpeakerView: View {
     @ObservedObject var p: Phantom
     let device: DDevice
+    @Environment(\.uiScale) private var s
     var body: some View {
         let ms = p.pingMs[device.id] ?? nil
         let active = p.identifying.contains(device.id)
-        VStack(spacing: 7) {
+        VStack(spacing: 6 * s) {
             Button { Task { await p.identify(device) } } label: {
-                PhantomGraphic(width: 130, identifying: active, dimmed: !p.online)
+                PhantomGraphic(width: 120 * s, identifying: active, dimmed: !p.online)
             }.buttonStyle(.plain).disabled(!p.canControl || active)
                 .accessibilityLabel("\(device.deviceName) identifizieren")
-            Text(device.deviceName).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-            HStack(spacing: 5) {
-                Circle().fill(ms == nil ? Color.orange : .green).frame(width: 6, height: 6)
-                Text("\(role) · \(ms.map { "\($0) ms" } ?? "nicht bestätigt")").font(.system(size: 9.5)).foregroundStyle(.secondary)
+            Text(device.deviceName).font(.system(size: 13 * s, weight: .semibold)).lineLimit(1)
+            HStack(spacing: 5 * s) {
+                Circle().fill(ms == nil ? Color.orange : .green).frame(width: 6 * s, height: 6 * s)
+                Text("\(role) · \(ms.map { "\($0) ms" } ?? "nicht bestätigt")").font(.system(size: 9.5 * s)).foregroundStyle(.secondary)
             }
             Text(active ? "TESTTON ANGEFORDERT" : "ZUM TESTEN KLICKEN")
-                .font(.system(size: 8.5, weight: .semibold)).tracking(0.7).foregroundStyle(Color.accentWarm)
-        }.frame(width: 155)
+                .font(.system(size: 8.5 * s, weight: .semibold)).tracking(0.7).foregroundStyle(Color.accentWarm)
+        }.frame(width: 150 * s)
     }
     var role: String {
         switch device.role { case "FrontLeft": return "Links"; case "FrontRight": return "Rechts"; default: return "Mono" }
+    }
+}
+/// Schwebender Fehlerhinweis oben im Fenster – verschiebt keine Inhalte.
+struct ErrorToast: View {
+    @ObservedObject var p: Phantom
+    var body: some View {
+        if let message = p.errorMessage {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.accentWarm)
+                Text(message).font(.system(size: 12)).textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Button { p.errorMessage = nil } label: { Image(systemName: "xmark") }.buttonStyle(.plain).accessibilityLabel("Fehlermeldung schließen")
+            }
+            .padding(12).frame(maxWidth: 560)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.accentWarm.opacity(0.35)))
+            .shadow(color: .black.opacity(0.4), radius: 14, y: 6)
+            .padding(.horizontal, 16)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
     }
 }
 struct ErrorBanner: View {
@@ -144,23 +228,31 @@ struct ErrorBanner: View {
         }
     }
 }
+/// Wie ausführlich die Karten sein dürfen, damit alles ohne Scrollen passt.
+enum CardDetail { case full, condensed, none }
+
 struct MainView: View {
     @ObservedObject var p = Phantom.shared
     var body: some View {
         GeometryReader { geo in
             let mode = LayoutMode(width: geo.size.width, height: geo.size.height)
+            let s = CGFloat(LayoutMode.scale(mode, width: geo.size.width, height: geo.size.height))
             Group {
-                if !p.everConnected { ScrollView { VStack(spacing: 20) { header; ErrorBanner(p: p); welcome; footer }.padding(26) } }
+                if !p.everConnected { welcome }
                 else {
                     switch mode {
                     case .compact: compact(geo.size)
-                    case .regular: regular
-                    case .large: large(geo.size)
+                    case .regular: regular(s)
+                    case .large: large(s)
                     }
                 }
             }
+            .environment(\.uiScale, s)
+            .controlSize(s < 0.9 ? .small : (s < 1.35 ? .regular : .large))
             .frame(width: geo.size.width, height: geo.size.height)
+            .overlay(alignment: .top) { ErrorToast(p: p).padding(.top, 30) }
             .animation(.easeInOut(duration: 0.25), value: mode)
+            .animation(.easeInOut(duration: 0.2), value: p.errorMessage)
         }
         .frame(minWidth: 280, idealWidth: 780, minHeight: 330, idealHeight: 800)
         .foregroundStyle(.white).environment(\.colorScheme, .dark)
@@ -179,9 +271,6 @@ struct MainView: View {
                 Spacer()
                 Button { p.deviceSheet = true } label: { Image(systemName: "gearshape") }.buttonStyle(.plain).foregroundStyle(.secondary).help("Geräte …")
             }
-            if let message = p.errorMessage {
-                Text(message).font(.system(size: 10)).foregroundStyle(Color.accentWarm).lineLimit(2).onTapGesture { p.errorMessage = nil }
-            }
             Spacer(minLength: 0)
             VolumeDial(p: p, size: dial).disabled(!p.canControl).opacity(p.online ? 1 : 0.45)
             Spacer(minLength: 0)
@@ -190,87 +279,115 @@ struct MainView: View {
         .padding(.horizontal, 18).padding(.top, 30).padding(.bottom, 18)
     }
 
-    // MARK: Normal – bisherige Ansicht, flexibel in der Breite
-    var regular: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                header
-                ErrorBanner(p: p)
-                HStack {
-                    if let first = p.speakers.first { SpeakerView(p: p, device: first) }
-                    Spacer(minLength: 0)
-                    VolumeDial(p: p).disabled(!p.canControl)
-                    Spacer(minLength: 0)
-                    if p.speakers.count > 1 { SpeakerView(p: p, device: p.speakers[1]) }
-                    else { Color.clear.frame(width: 155, height: 1) }
-                }.opacity(p.online ? 1 : 0.45)
-                volumeButtons(size: 40, mute: 46)
-                HStack(alignment: .top, spacing: 18) { playback(showNowPlaying: true); sound }
-                    .disabled(!p.canControl)
-                footer
-            }.padding(26)
+    // MARK: Normal – alles skaliert; wird es knapp, fallen erst Hinweise, dann Karten weg
+    func regular(_ s: CGFloat) -> some View {
+        // Erst schrittweise verkleinern, dann Hinweise weglassen, erst ganz zuletzt die Karten.
+        ViewThatFits(in: .vertical) {
+            regularBody(s, cards: .full)
+            regularBody(s * 0.92, cards: .full)
+            regularBody(s * 0.92, cards: .condensed)
+            regularBody(s * 0.84, cards: .condensed)
+            regularBody(max(0.7, s * 0.76), cards: .condensed)
+            regularBody(s, cards: .none)
+            compact(CGSize(width: 400 * s, height: 420 * s))
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    func regularBody(_ s: CGFloat, cards: CardDetail) -> some View {
+        VStack(spacing: 16 * s) {
+            header(s)
+            HStack {
+                if let first = p.speakers.first { SpeakerView(p: p, device: first) }
+                Spacer(minLength: 8 * s)
+                VolumeDial(p: p, size: 220 * s).disabled(!p.canControl)
+                Spacer(minLength: 8 * s)
+                if p.speakers.count > 1 { SpeakerView(p: p, device: p.speakers[1]) }
+                else { Color.clear.frame(width: 150 * s, height: 1) }
+            }.opacity(p.online ? 1 : 0.45)
+            volumeButtons(size: 38 * s, mute: 46 * s)
+            if cards != .none {
+                HStack(alignment: .top, spacing: 16 * s) {
+                    playback(s, showNowPlaying: true, detail: cards)
+                    sound(s, detail: cards)
+                }.disabled(!p.canControl)
+            }
+            Spacer(minLength: 0)   // übriger Platz unten; Fußzeile bleibt am Rand
+            footer(s)
+        }
+        .padding(.horizontal, 24 * s).padding(.top, 28 * s).padding(.bottom, 18 * s)
+        .frame(maxHeight: .infinity)
+        .environment(\.uiScale, s)   // Karten, Lautsprecher usw. im selben Maßstab wie diese Variante
     }
 
-    // MARK: Groß / Vollbild – Now Playing
-    func large(_ size: CGSize) -> some View {
-        let dial = min(420, max(260, size.height * 0.42))
-        return ScrollView {
-            VStack(spacing: 28) {
-                header
-                ErrorBanner(p: p)
-                HStack(alignment: .center, spacing: 48) {
-                    nowPlaying(art: min(300, size.height * 0.3))
-                        .frame(maxWidth: .infinity)
-                    VStack(spacing: 18) {
-                        VolumeDial(p: p, size: dial).disabled(!p.canControl).opacity(p.online ? 1 : 0.45)
-                        volumeButtons(size: 46, mute: 56)
-                        HStack(spacing: 24) { ForEach(p.speakers) { SpeakerView(p: p, device: $0) } }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                HStack(alignment: .top, spacing: 24) { playback(showNowPlaying: false); sound }
-                    .disabled(!p.canControl)
-                footer
-            }
-            .padding(.horizontal, 48).padding(.vertical, 36)
-            .frame(maxWidth: 1500)
-            .frame(maxWidth: .infinity)
+    // MARK: Groß / Vollbild – drei Spalten, alles auf einem Bildschirm
+    func large(_ s: CGFloat) -> some View {
+        ViewThatFits(in: .vertical) {
+            largeBody(s, cards: .full, speakers: true)
+            largeBody(s * 0.92, cards: .full, speakers: true)
+            largeBody(s * 0.92, cards: .condensed, speakers: true)
+            largeBody(s * 0.84, cards: .condensed, speakers: true)
+            largeBody(s * 0.84, cards: .condensed, speakers: false)
+            largeBody(max(0.7, s * 0.76), cards: .none, speakers: false)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    func largeBody(_ s: CGFloat, cards: CardDetail, speakers: Bool) -> some View {
+        VStack(spacing: 26 * s) {
+            header(s)
+            Spacer(minLength: 0)
+            HStack(alignment: .center, spacing: 36 * s) {
+                nowPlaying(s).frame(maxWidth: .infinity)
+                VStack(spacing: 18 * s) {
+                    VolumeDial(p: p, size: 300 * s).disabled(!p.canControl).opacity(p.online ? 1 : 0.45)
+                    volumeButtons(size: 44 * s, mute: 54 * s)
+                    if speakers { HStack(spacing: 16 * s) { ForEach(p.speakers) { SpeakerView(p: p, device: $0) } } }
+                }.frame(maxWidth: .infinity)
+                if cards != .none {
+                    VStack(spacing: 16 * s) {
+                        playback(s, showNowPlaying: false, detail: cards)
+                        sound(s, detail: cards)
+                    }.frame(maxWidth: .infinity).disabled(!p.canControl)
+                }
+            }
+            Spacer(minLength: 0)
+            footer(s)
+        }
+        .padding(.horizontal, 40 * s).padding(.top, 34 * s).padding(.bottom, 22 * s)
+        .frame(maxHeight: .infinity)
+        .environment(\.uiScale, s)
     }
 
     /// Große Wiedergabe-Ansicht: Quelle, Titel, Interpret, Format und Transport-Buttons.
-    func nowPlaying(art: CGFloat) -> some View {
+    func nowPlaying(_ s: CGFloat) -> some View {
         let info = sourceInfo(p.currentType)
+        let art = 220 * s
         let canPrevious = p.ops.contains("previous"), canNext = p.ops.contains("next")
-        let playPause = p.playing ? "pause" : "play"
-        let canPlayPause = p.ops.contains(playPause)
-        return VStack(spacing: 22) {
+        let canPlayPause = p.ops.contains(p.playing ? "pause" : "play")
+        return VStack(spacing: 18 * s) {
             ZStack {
                 RoundedRectangle(cornerRadius: art * 0.12)
                     .fill(LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.03)], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .overlay(RoundedRectangle(cornerRadius: art * 0.12).stroke(.white.opacity(0.08)))
                 Image(systemName: info.icon).font(.system(size: art * 0.32, weight: .light)).foregroundStyle(Color.accentWarm)
             }.frame(width: art, height: art)
-            VStack(spacing: 8) {
-                Text("JETZT LÄUFT").font(.system(size: 11, weight: .semibold)).tracking(2.5).foregroundStyle(.secondary)
-                Text(p.title.isEmpty ? info.label : p.title).font(.system(size: 30, weight: .semibold)).multilineTextAlignment(.center).lineLimit(2)
+            VStack(spacing: 6 * s) {
+                Text("JETZT LÄUFT").font(.system(size: 11 * s, weight: .semibold)).tracking(2.5 * s).foregroundStyle(.secondary)
+                Text(p.title.isEmpty ? info.label : p.title).font(.system(size: 28 * s, weight: .semibold)).multilineTextAlignment(.center).lineLimit(2)
                 let detail = [p.artist, p.peer].filter { !$0.isEmpty }.joined(separator: " · ")
-                if !detail.isEmpty { Text(detail).font(.system(size: 17)).foregroundStyle(.secondary).lineLimit(1) }
-                if !p.codec.isEmpty { Text(p.codec).font(.system(size: 12, weight: .medium)).foregroundStyle(Color.accentWarm.opacity(0.85)) }
+                if !detail.isEmpty { Text(detail).font(.system(size: 16 * s)).foregroundStyle(.secondary).lineLimit(1) }
+                if !p.codec.isEmpty { Text(p.codec).font(.system(size: 12 * s, weight: .medium)).foregroundStyle(Color.accentWarm.opacity(0.85)) }
             }
-            HStack(spacing: 26) {
-                RoundIconButton(icon: "backward.fill", size: 54) { Task { await p.previous() } }
+            HStack(spacing: 24 * s) {
+                RoundIconButton(icon: "backward.fill", size: 50 * s) { Task { await p.previous() } }
                     .disabled(!canPrevious).opacity(canPrevious ? 1 : 0.35).accessibilityLabel("Zurück")
-                RoundIconButton(icon: p.playing ? "pause.fill" : "play.fill", size: 76, active: canPlayPause) { Task { await p.playPause() } }
+                RoundIconButton(icon: p.playing ? "pause.fill" : "play.fill", size: 70 * s, active: canPlayPause) { Task { await p.playPause() } }
                     .disabled(!canPlayPause).opacity(canPlayPause ? 1 : 0.35).accessibilityLabel(p.playing ? "Pause" : "Wiedergabe")
-                RoundIconButton(icon: "forward.fill", size: 54) { Task { await p.next() } }
+                RoundIconButton(icon: "forward.fill", size: 50 * s) { Task { await p.next() } }
                     .disabled(!canNext).opacity(canNext ? 1 : 0.35).accessibilityLabel("Weiter")
-            }
-            .disabled(!p.canControl)
+            }.disabled(!p.canControl)
             if !canPrevious && !canNext && !canPlayPause {
                 Text("\(info.label): Wiedergabe am Zuspieler steuern – diese Quelle bietet keine Fernsteuerung.")
-                    .font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .font(.system(size: 11 * s)).foregroundStyle(.secondary).multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -283,55 +400,57 @@ struct MainView: View {
         }.disabled(!p.canControl)
     }
 
-    var header: some View {
+    func header(_ s: CGFloat) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(p.systemName).font(.system(size: 24, weight: .light)).tracking(2)
-                Text(p.target == nil ? "Inoffizielle Fernbedienung · Beta" : "\(p.model) · \(p.speakers.count) Lautsprecher").font(.system(size: 11)).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 3 * s) {
+                Text(p.systemName).font(.system(size: 24 * s, weight: .light)).tracking(2 * s)
+                Text(p.target == nil ? "Inoffizielle Fernbedienung · Beta" : "\(p.model) · \(p.speakers.count) Lautsprecher").font(.system(size: 11 * s)).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(p.online ? "● Verbunden" : p.status).font(.system(size: 11)).foregroundStyle(p.online ? .green : .secondary)
-            Button("Geräte …") { p.deviceSheet = true }.disabled(p.busy)
+            Text(p.online ? "● Verbunden" : p.status).font(.system(size: 11 * s)).foregroundStyle(p.online ? .green : .secondary)
+            Button("Geräte …") { p.deviceSheet = true }.disabled(p.busy).buttonStyle(ScaledPillStyle(s: s))
         }
     }
 
     var welcome: some View {
         VStack(spacing: 18) {
-            PhantomGraphic(width: 170)
+            Spacer(minLength: 0)
+            PhantomGraphic(width: 150)
             Text("Wähle dein Phantom-System aus.").font(.title3)
-            Text("Automatisch im lokalen Netzwerk suchen oder eine IP-Adresse eingeben.").font(.callout).foregroundStyle(.secondary)
+            Text("Automatisch im lokalen Netzwerk suchen oder eine IP-Adresse eingeben.").font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
             Button("Geräte auswählen") { p.deviceSheet = true }.buttonStyle(.borderedProminent).tint(.accentWarm).foregroundStyle(.black)
-        }.frame(maxWidth: .infinity).padding(.vertical, 60)
+            Spacer(minLength: 0)
+            footer(1)
+        }.padding(24)
     }
 
-    var footer: some View {
+    func footer(_ s: CGFloat) -> some View {
         HStack {
-            Text("⌃⌥↑ / ↓ Lautstärke · ⌃⌥M Stumm").font(.system(size: 10)).foregroundStyle(.secondary)
-            Spacer()
+            Text("⌃⌥↑ / ↓ Lautstärke · ⌃⌥M Stumm").font(.system(size: 10 * s)).foregroundStyle(.secondary).lineLimit(1)
+            Spacer(minLength: 8)
             if p.pending > 0 { ProgressView().controlSize(.small) }
             UpdateStatusView()
-            Button("Verbindung prüfen") { Task { await p.refresh() } }.disabled(p.busy || p.target == nil).controlSize(.small)
+            Button("Verbindung prüfen") { Task { await p.refresh() } }.disabled(p.busy || p.target == nil).buttonStyle(ScaledPillStyle(s: s))
         }
     }
-    func playback(showNowPlaying: Bool) -> some View {
+
+    func playback(_ s: CGFloat, showNowPlaying: Bool, detail: CardDetail) -> some View {
         Card(title: showNowPlaying ? "Wiedergabe" : "Quelle") {
             if showNowPlaying {
-            HStack {
-                Image(systemName: sourceInfo(p.currentType).icon).font(.title2).foregroundStyle(Color.accentWarm)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(p.title.isEmpty ? sourceInfo(p.currentType).label : p.title).font(.headline).lineLimit(1)
-                    Text([p.artist, p.peer, p.codec].filter { !$0.isEmpty }.joined(separator: " · ")).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                }
-                Spacer()
-            }
-            if p.ops.contains("play") || p.ops.contains("pause") {
-                HStack {
-                    if p.ops.contains("previous") { Button { Task { await p.previous() } } label: { Image(systemName: "backward.fill") } }
-                    Button { Task { await p.playPause() } } label: { Image(systemName: p.playing ? "pause.fill" : "play.fill") }
-                        .disabled(!p.ops.contains(p.playing ? "pause" : "play"))
-                    if p.ops.contains("next") { Button { Task { await p.next() } } label: { Image(systemName: "forward.fill") } }
-                }.buttonStyle(.bordered)
-            }
+                HStack(spacing: 10 * s) {
+                    Image(systemName: sourceInfo(p.currentType).icon).font(.system(size: 20 * s)).foregroundStyle(Color.accentWarm)
+                    VStack(alignment: .leading, spacing: 3 * s) {
+                        Text(p.title.isEmpty ? sourceInfo(p.currentType).label : p.title).font(.system(size: 14 * s, weight: .semibold)).lineLimit(1)
+                        Text([p.artist, p.peer, p.codec].filter { !$0.isEmpty }.joined(separator: " · ")).font(.system(size: 11 * s)).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    if p.ops.contains("play") || p.ops.contains("pause") {
+                        if p.ops.contains("previous") { Button { Task { await p.previous() } } label: { Image(systemName: "backward.fill") } }
+                        Button { Task { await p.playPause() } } label: { Image(systemName: p.playing ? "pause.fill" : "play.fill") }
+                            .disabled(!p.ops.contains(p.playing ? "pause" : "play"))
+                        if p.ops.contains("next") { Button { Task { await p.next() } } label: { Image(systemName: "forward.fill") } }
+                    }
+                }.buttonStyle(ScaledPillStyle(s: s))
             }
             ForEach(p.selectableSources) { source in
                 Button { Task { await p.select(source) } } label: {
@@ -340,40 +459,47 @@ struct MainView: View {
                         Text(p.sourceLabel(source)).lineLimit(1)
                         Spacer()
                         if p.currentSourceID == source.id { Image(systemName: "checkmark").foregroundStyle(Color.accentWarm) }
-                    }.padding(9).background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 9))
+                    }
+                    .font(.system(size: 13 * s))
+                    .padding(8 * s).background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 9 * s))
                 }.buttonStyle(.plain)
             }
-            Button("Mac per AirPlay verbinden …") { p.openAirPlaySettings() }.controlSize(.small)
-            Text("Spotify, Bluetooth, Roon und UPnP werden vom jeweiligen Zuspieler gestartet.").font(.system(size: 10)).foregroundStyle(.secondary)
+            Button("Mac per AirPlay verbinden …") { p.openAirPlaySettings() }.buttonStyle(ScaledPillStyle(s: s))
+            if detail == .full {
+                Text("Spotify, Bluetooth, Roon und UPnP werden vom jeweiligen Zuspieler gestartet.").font(.system(size: 10 * s)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
         }.frame(minWidth: 0, maxWidth: .infinity)
     }
-    var sound: some View {
+
+    func sound(_ s: CGFloat, detail: CardDetail) -> some View {
         Card(title: "Klang") {
             if p.supportsNight {
-                Toggle("Nachtmodus", isOn: Binding(get: { p.nightMode }, set: { value in Task { await p.setNight(value) } })).toggleStyle(.switch).tint(.accentWarm)
+                ScaledSwitch(title: "Nachtmodus", isOn: p.nightMode, s: s) { value in Task { await p.setNight(value) } }
             }
             if p.supportsEq {
-                Picker("Klang", selection: Binding(get: { p.eqPreset }, set: { value in Task { await p.setEq(value) } })) {
-                    ForEach(p.eqPresets, id: \.self) { preset in Text(presetName(preset)).tag(preset) }
-                }.labelsHidden()
+                ScaledSegments(options: p.eqPresets.sorted { presetOrder($0) < presetOrder($1) }.map { (id: $0, label: presetName($0)) }, selected: p.eqPreset, s: s) { value in
+                    Task { await p.setEq(value) }
+                }
                 if p.eqPresets.contains("custom") {
-                    Text("Regler aktivieren „Eigene“.").font(.caption2).foregroundStyle(.secondary)
-                    adjustment("Bass", value: $p.eqLow, range: p.eqRange, unit: "dB") { p.sendCustomEq() }
-                    adjustment("Höhen", value: $p.eqHigh, range: p.eqRange, unit: "dB") { p.sendCustomEq() }
+                    if detail == .full { Text("Regler aktivieren „Eigene“.").font(.system(size: 10 * s)).foregroundStyle(.secondary) }
+                    adjustment(s, "Bass", value: $p.eqLow, range: p.eqRange, unit: "dB") { p.sendCustomEq() }
+                    adjustment(s, "Höhen", value: $p.eqHigh, range: p.eqRange, unit: "dB") { p.sendCustomEq() }
                 }
             }
-            if p.supportsBalance { adjustment("Balance", value: $p.balance, range: -10...10, unit: "") { p.sendBalance() } }
+            if p.supportsBalance { adjustment(s, "Balance", value: $p.balance, range: -10...10, unit: "") { p.sendBalance() } }
             if !p.supportsNight && !p.supportsEq && !p.supportsBalance {
-                Text("Für dieses System sind keine Klangeinstellungen verfügbar.").font(.callout).foregroundStyle(.secondary)
+                Text("Für dieses System sind keine Klangeinstellungen verfügbar.").font(.system(size: 12 * s)).foregroundStyle(.secondary)
             }
         }.frame(minWidth: 0, maxWidth: .infinity)
     }
-    func adjustment(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, action: @escaping () -> Void) -> some View {
-        VStack(spacing: 4) {
-            HStack { Text(title); Spacer(); Text("\(Int(value.wrappedValue)) \(unit)").monospacedDigit().foregroundStyle(.secondary) }.font(.caption)
+
+    func adjustment(_ s: CGFloat, _ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, action: @escaping () -> Void) -> some View {
+        VStack(spacing: 3 * s) {
+            HStack { Text(title); Spacer(); Text("\(Int(value.wrappedValue)) \(unit)").monospacedDigit().foregroundStyle(.secondary) }.font(.system(size: 11 * s))
             Slider(value: value, in: range, step: 1, onEditingChanged: { editing in if editing { p.beginDrag() } else { action(); p.endDrag() } }).tint(.accentWarm)
         }
     }
+    func presetOrder(_ value: String) -> Int { ["flat": 0, "voice": 1, "custom": 2][value] ?? 9 }
     func presetName(_ value: String) -> String { ["flat": "Neutral", "voice": "Sprache", "custom": "Eigene"][value] ?? value }
 }
 struct DevicesView: View {
@@ -465,11 +591,12 @@ struct MenuPanel: View {
 /// Fußzeile: Version, Prüf-Button und Ergebnis. Öffnet bei einem Update nur die Release-Seite.
 struct UpdateStatusView: View {
     @ObservedObject var u = UpdateChecker.shared
+    @Environment(\.uiScale) private var s
     var body: some View {
         HStack(spacing: 6) {
             switch u.state {
             case .idle:
-                Button("\(u.currentText) · Nach Updates suchen") { Task { await u.check() } }
+                Button("\(u.currentText) · Nach Updates suchen") { Task { await u.check() } }.buttonStyle(ScaledPillStyle(s: s))
             case .checking:
                 ProgressView().controlSize(.small)
                 Text("Suche Updates …").foregroundStyle(.secondary)
@@ -482,7 +609,7 @@ struct UpdateStatusView: View {
                     Button { Task { await u.install() } } label: {
                         Label("Update \(version) installieren", systemImage: "arrow.down.circle.fill")
                     }
-                    .buttonStyle(.borderedProminent).tint(.accentWarm).foregroundStyle(.black)
+                    .buttonStyle(ScaledPillStyle(s: s, prominent: true))
                     .help("Lädt das Update von GitHub, prüft es, legt die alte Version in den Papierkorb und startet neu.")
                     Button { NSWorkspace.shared.open(page) } label: { Image(systemName: "safari") }
                         .buttonStyle(.plain).foregroundStyle(.secondary).help("Release-Seite mit Änderungen öffnen")
@@ -490,7 +617,7 @@ struct UpdateStatusView: View {
                     Button { NSWorkspace.shared.open(page) } label: {
                         Label("Update \(version) – Herunterladen", systemImage: "arrow.down.circle.fill")
                     }
-                    .buttonStyle(.borderedProminent).tint(.accentWarm).foregroundStyle(.black)
+                    .buttonStyle(ScaledPillStyle(s: s, prominent: true))
                     .help(u.selfUpdateBlocker ?? "Dieses Release enthält keinen prüfbaren Download – öffnet die Release-Seite.")
                 }
             case .installing(let step):
@@ -498,10 +625,10 @@ struct UpdateStatusView: View {
                 Text(step).foregroundStyle(Color.accentWarm)
             case .failed(let message):
                 Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).help(message)
-                Button("Erneut prüfen") { Task { await u.check() } }.help(message)
+                Button("Erneut prüfen") { Task { await u.check() } }.buttonStyle(ScaledPillStyle(s: s)).help(message)
             }
         }
-        .font(.system(size: 11)).controlSize(.small)
+        .font(.system(size: 11 * s))
     }
 }
 

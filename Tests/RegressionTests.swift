@@ -411,6 +411,15 @@ func makeFakeRelease(in dir: URL, bundleID: String, version: String, tamper: Boo
         let failed = (try? SelfUpdate.replace(current: installed, with: missing, putAside: putAside)) == nil
         let restored = (try? String(contentsOf: installed.appendingPathComponent("marker"), encoding: .utf8)) == "new"
         expect(failed && restored, "failed replacement restores the previous version")
+        // --- Skalierung: folgt der knapperen Achse, Referenzgröße = Maßstab 1 ---
+        let rr = LayoutMode.regularReference, lr = LayoutMode.largeReference
+        expect(LayoutMode.scale(.regular, width: rr.width, height: rr.height) == 1 && LayoutMode.scale(.large, width: lr.width, height: lr.height) == 1, "reference sizes have scale 1")
+        expect(LayoutMode.scale(.regular, width: 1000, height: rr.height) == 1, "wider window alone does not overflow vertically")
+        expect(LayoutMode.scale(.regular, width: 1090, height: 1000) > 1.2, "bigger window enlarges the interface")
+        expect(LayoutMode.scale(.regular, width: 640, height: 600) >= 0.75 && LayoutMode.scale(.regular, width: 300, height: 300) == 0.75, "scale never drops below its lower bound")
+        expect(LayoutMode.scale(.large, width: 2560, height: 1440) == min(2560.0 / lr.width, 1440.0 / lr.height), "large screens scale up proportionally")
+        expect(LayoutMode.scale(.large, width: 9000, height: 9000) == 2.2, "scale has an upper bound")
+        expect(LayoutMode.scale(.large, width: 1512, height: 945) > 1.1, "MacBook full screen uses the available space")
         print("\(checks) checks passed. Mock transport only; no physical devices contacted.")
     }
 }

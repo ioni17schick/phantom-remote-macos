@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.5-beta — 2026-11-22
+
+- Kein Scrollen mehr: Die gesamte Oberfläche skaliert mit der Fenstergröße (Schrift, Rad, Lautsprecher, Knöpfe, Karten, Abstände).
+- Eigene, mitskalierende Knöpfe, Schalter und Klang-Auswahl statt fester macOS-Standardgrößen.
+- Wird es knapp: zuerst schrittweise verkleinern (92/84/76 %), dann Hinweise und zuletzt Karten weglassen – nie abschneiden.
+- Vollbild mit drei Spalten (Now Playing | Lautstärke + Lautsprecher | Quelle + Klang), Kopf- und Fußzeile am Rand.
+- Fehlermeldungen als schwebender Hinweis, verschieben keine Inhalte.
+- Klang-Voreinstellungen in fester Reihenfolge: Neutral, Sprache, Eigene.
+- 117 Regressionstests.
+
 ## 0.1.4-beta — 2026-11-22
 
 - Selbst-Update: „Update installieren“ lädt, prüft und installiert die neue Version direkt in der App und startet neu (nur auf Knopfdruck).
