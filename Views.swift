@@ -186,7 +186,7 @@ struct VolumeDial: View {
             Circle().trim(from: 0, to: 0.75 * fraction).stroke(Color.accentWarm, style: StrokeStyle(lineWidth: ring, lineCap: .round)).rotationEffect(.degrees(135)).padding(size * 0.125)
             VStack(spacing: size * 0.016) {
                 Text(p.muted ? "–" : "\(Int(p.volume))").font(.system(size: size * 0.267, weight: .ultraLight, design: .rounded)).monospacedDigit()
-                Text(p.muted ? "STUMM" : "LAUTSTÄRKE").font(.system(size: max(9, size * 0.042), weight: .semibold)).tracking(2).foregroundStyle(.secondary)
+                Text(p.muted ? String(localized: "STUMM") : String(localized: "LAUTSTÄRKE")).font(.system(size: max(9, size * 0.042), weight: .semibold)).tracking(2).foregroundStyle(.secondary)
                 Text("Limit \(p.volumeLimit)").font(.system(size: max(9, size * 0.042))).foregroundStyle(Color.accentWarm.opacity(0.8))
             }
         }
@@ -225,12 +225,12 @@ struct SpeakerView: View {
                 Circle().fill(ms == nil ? Color.orange : .green).frame(width: 6 * s, height: 6 * s)
                 Text("\(role) · \(ms.map { "\($0) ms" } ?? "nicht bestätigt")").font(.system(size: 9.5 * s)).foregroundStyle(.secondary)
             }
-            Text(active ? "TESTTON ANGEFORDERT" : "ZUM TESTEN KLICKEN")
+            Text(active ? String(localized: "TESTTON ANGEFORDERT") : String(localized: "ZUM TESTEN KLICKEN"))
                 .font(.system(size: 8.5 * s, weight: .semibold)).tracking(0.7).foregroundStyle(Color.accentWarm)
         }.frame(width: 150 * s)
     }
     var role: String {
-        switch device.role { case "FrontLeft": return "Links"; case "FrontRight": return "Rechts"; default: return "Mono" }
+        switch device.role { case String(localized: "FrontLeft"): return String(localized: "Links"); case String(localized: "FrontRight"): return String(localized: "Rechts"); default: return String(localized: "Mono") }
     }
 }
 /// Schwebender Fehlerhinweis oben im Fenster – verschiebt keine Inhalte.
@@ -422,7 +422,7 @@ struct MainView: View {
                 RoundIconButton(icon: "backward.fill", size: 50 * s) { Task { await p.previous() } }
                     .disabled(!canPrevious).opacity(canPrevious ? 1 : 0.35).accessibilityLabel("Zurück")
                 RoundIconButton(icon: p.playing ? "pause.fill" : "play.fill", size: 70 * s, active: canPlayPause) { Task { await p.playPause() } }
-                    .disabled(!canPlayPause).opacity(canPlayPause ? 1 : 0.35).accessibilityLabel(p.playing ? "Pause" : "Wiedergabe")
+                    .disabled(!canPlayPause).opacity(canPlayPause ? 1 : 0.35).accessibilityLabel(p.playing ? "Pause" : String(localized: "Wiedergabe"))
                 RoundIconButton(icon: "forward.fill", size: 50 * s) { Task { await p.next() } }
                     .disabled(!canNext).opacity(canNext ? 1 : 0.35).accessibilityLabel("Weiter")
             }.disabled(!p.canControl)
@@ -445,10 +445,10 @@ struct MainView: View {
         HStack {
             VStack(alignment: .leading, spacing: 3 * s) {
                 Text(p.systemName).font(.system(size: 24 * s, weight: .light)).tracking(2 * s)
-                Text(p.target == nil ? "Inoffizielle Fernbedienung · Beta" : "\(p.model) · \(p.speakers.count) Lautsprecher").font(.system(size: 11 * s)).foregroundStyle(.secondary)
+                Text(p.target == nil ? String(localized: "Inoffizielle Fernbedienung · Beta") : String(localized: "\(p.model) · \(p.speakers.count) Lautsprecher")).font(.system(size: 11 * s)).foregroundStyle(.secondary)
             }
             Spacer()
-            Text(p.online ? "● Verbunden" : p.status).font(.system(size: 11 * s)).foregroundStyle(p.online ? .green : .secondary)
+            Text(p.online ? String(localized: "● Verbunden") : p.status).font(.system(size: 11 * s)).foregroundStyle(p.online ? .green : .secondary)
             Button("Geräte …") { p.deviceSheet = true }.disabled(p.busy).buttonStyle(ScaledPillStyle(s: s))
         }
     }
@@ -476,7 +476,7 @@ struct MainView: View {
     }
 
     func playback(_ s: CGFloat, showNowPlaying: Bool, detail: CardDetail) -> some View {
-        Card(title: showNowPlaying ? "Wiedergabe" : "Quelle") {
+        Card(title: showNowPlaying ? String(localized: "Wiedergabe") : String(localized: "Quelle")) {
             if showNowPlaying {
                 HStack(spacing: 10 * s) {
                     Image(systemName: sourceInfo(p.currentType).icon).font(.system(size: 20 * s)).foregroundStyle(Color.accentWarm)
@@ -513,9 +513,9 @@ struct MainView: View {
     }
 
     func sound(_ s: CGFloat, detail: CardDetail) -> some View {
-        Card(title: "Klang") {
+        Card(title: String(localized: "Klang")) {
             if p.supportsNight {
-                ScaledSwitch(title: "Nachtmodus", isOn: p.nightMode, s: s) { value in Task { await p.setNight(value) } }
+                ScaledSwitch(title: String(localized: "Nachtmodus"), isOn: p.nightMode, s: s) { value in Task { await p.setNight(value) } }
             }
             if p.supportsEq {
                 ScaledSegments(options: p.eqPresets.sorted { presetOrder($0) < presetOrder($1) }.map { (id: $0, label: presetName($0)) }, selected: p.eqPreset, s: s) { value in
@@ -524,7 +524,7 @@ struct MainView: View {
                 if p.eqPresets.contains("custom") {
                     if detail == .full { Text("Regler aktivieren „Eigene“.").font(.system(size: 10 * s)).foregroundStyle(.secondary) }
                     adjustment(s, "Bass", value: $p.eqLow, range: p.eqRange, unit: "dB") { p.sendCustomEq() }
-                    adjustment(s, "Höhen", value: $p.eqHigh, range: p.eqRange, unit: "dB") { p.sendCustomEq() }
+                    adjustment(s, String(localized: "Höhen"), value: $p.eqHigh, range: p.eqRange, unit: String(localized: "dB")) { p.sendCustomEq() }
                 }
             }
             if p.supportsBalance { adjustment(s, "Balance", value: $p.balance, range: -10...10, unit: "") { p.sendBalance() } }
@@ -541,7 +541,7 @@ struct MainView: View {
         }
     }
     func presetOrder(_ value: String) -> Int { ["flat": 0, "voice": 1, "custom": 2][value] ?? 9 }
-    func presetName(_ value: String) -> String { ["flat": "Neutral", "voice": "Sprache", "custom": "Eigene"][value] ?? value }
+    func presetName(_ value: String) -> String { [String(localized: "flat"): String(localized: "Neutral"), String(localized: "voice"): String(localized: "Sprache"), String(localized: "custom"): String(localized: "Eigene")][value] ?? value }
 }
 struct DevicesView: View {
     @ObservedObject var p: Phantom
@@ -562,7 +562,7 @@ struct DevicesView: View {
                 Button("Prüfen") { Task { await p.addAddress() } }.disabled(p.busy || p.addressInput.isEmpty)
             }
             HStack {
-                Button(p.searching ? "Suche läuft …" : "Im Netzwerk suchen (mDNS)") { p.rediscover() }.disabled(p.searching)
+                Button(p.searching ? String(localized: "Suche läuft …") : String(localized: "Im Netzwerk suchen (mDNS)")) { p.rediscover() }.disabled(p.searching)
                 if p.searching || p.connecting { ProgressView().controlSize(.small) }
             }
             ScrollView {
@@ -576,7 +576,7 @@ struct DevicesView: View {
                             }
                             Spacer()
                             if found.device.isSystemLeader == true {
-                                Button(p.target?.deviceID == found.id ? "Erneut verbinden" : "Auswählen") { Task { await p.connect(found) } }.disabled(p.busy)
+                                Button(p.target?.deviceID == found.id ? String(localized: "Erneut verbinden") : String(localized: "Auswählen")) { Task { await p.connect(found) } }.disabled(p.busy)
                             } else { Image(systemName: "link").foregroundStyle(.secondary) }
                         }.padding(12).background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 12))
                     }
@@ -614,7 +614,7 @@ struct MenuPanel: View {
                 Button { Task { await p.step(2, hud: false) } } label: { Image(systemName: "plus") }
                 Text("\(Int(p.volume))").monospacedDigit()
             }.disabled(!p.canControl)
-            Button(p.muted ? "Stummschaltung aufheben" : "Stummschalten") { Task { await p.toggleMute(hud: false) } }.disabled(!p.canControl)
+            Button(p.muted ? String(localized: "Stummschaltung aufheben") : String(localized: "Stummschalten")) { Task { await p.toggleMute(hud: false) } }.disabled(!p.canControl)
             MenuUpdateHint()
             Divider()
             HStack {
@@ -659,7 +659,7 @@ struct UpdateStatusView: View {
                         Label("Update \(version) – Herunterladen", systemImage: "arrow.down.circle.fill")
                     }
                     .buttonStyle(ScaledPillStyle(s: s, prominent: true))
-                    .help(u.selfUpdateBlocker ?? "Dieses Release enthält keinen prüfbaren Download – öffnet die Release-Seite.")
+                    .help(u.selfUpdateBlocker ?? String(localized: "Dieses Release enthält keinen prüfbaren Download – öffnet die Release-Seite."))
                 }
             case .installing(let step):
                 ProgressView().controlSize(.small)
@@ -689,7 +689,7 @@ struct MenuUpdateHint: View {
     var body: some View {
         if case .available(let version, let page) = u.state {
             Button { if u.canSelfUpdate { Task { await u.install() } } else { NSWorkspace.shared.open(page) } } label: {
-                Label(u.canSelfUpdate ? "Update \(version) installieren" : "Update \(version) verfügbar", systemImage: "arrow.down.circle.fill")
+                Label(u.canSelfUpdate ? String(localized: "Update \(version) installieren") : String(localized: "Update \(version) verfügbar"), systemImage: String(localized: "arrow.down.circle.fill"))
             }.tint(.accentWarm)
         } else if case .installing(let step) = u.state {
             Label(step, systemImage: "arrow.down.circle").foregroundStyle(Color.accentWarm)

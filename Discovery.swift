@@ -31,7 +31,7 @@ final class Discovery: NSObject, @preconcurrency NetServiceBrowserDelegate, @pre
         services.append(service); service.delegate = self; service.resolve(withTimeout: 4)
     }
     func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: NSNumber]) {
-        onState?(false, "mDNS-Suche fehlgeschlagen. Netzwerkzugriff in macOS prüfen oder IP-Adresse verwenden.")
+        onState?(false, String(localized: "mDNS-Suche fehlgeschlagen. Netzwerkzugriff in macOS prüfen oder IP-Adresse verwenden."))
     }
     func netServiceDidResolveAddress(_ service: NetService) {
         guard let host = service.hostName, let endpoint = try? Endpoint("\(host):\(service.port)") else { return }

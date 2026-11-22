@@ -1,10 +1,10 @@
-Inoffizielle Beta-Fernbedienung für Devialet Phantom (DOS 2) – **nicht von Devialet**.
+Unofficial beta remote for Devialet Phantom (DOS 2) – **not made by Devialet**. 🇩🇪 Deutsche Beschreibung: [README.de.md](https://github.com/ioni17schick/phantom-remote-macos/blob/main/README.de.md)
 
-> ⚠️ **Nicht notarisiert.** Diese App ist nur ad hoc signiert, nicht mit einer Apple-Developer-ID. macOS blockiert sie beim ersten Start. Anleitung zum Öffnen und zur Prüfung: siehe [README → Download](https://github.com/ioni17schick/phantom-remote-macos#download-beta-nicht-notarisiert). Wer dem nicht vertrauen möchte, baut die App mit `./build.sh` selbst aus dem Quellcode.
+> ⚠️ **Not notarized.** This app is only ad hoc signed, not with an Apple Developer ID, so macOS blocks it on first launch. How to open and verify it: [README → Download](https://github.com/ioni17schick/phantom-remote-macos#download-beta-not-notarized). If you’d rather not, build it yourself from source with `./build.sh`. Existing installations (0.1.4+) can update from inside the app.
 
-- Universal-App (Apple Silicon und Intel), macOS 14 oder neuer
-- Von GitHub Actions aus genau diesem Tag gebaut, mit Herkunftsnachweis:
+- Universal app (Apple Silicon and Intel), macOS 14 or later, English and German
+- Built by GitHub Actions from exactly this tag, with provenance attestation:
   `gh attestation verify Phantom-Remote-*-unsigned.zip --repo ioni17schick/phantom-remote-macos`
-- SHA-256-Prüfsumme liegt als `.sha256`-Datei bei
+- SHA-256 checksum included as `.sha256` file
 
-Das Projekt ist vollständig per Vibe Coding mit KI-Assistenten entstanden; es gab kein unabhängiges menschliches Code-Audit. Änderungen: siehe [CHANGELOG](https://github.com/ioni17schick/phantom-remote-macos/blob/main/CHANGELOG.md).
+Created entirely by vibe coding with AI assistants; no independent human code audit. Changes: see the [CHANGELOG](https://github.com/ioni17schick/phantom-remote-macos/blob/main/CHANGELOG.md).

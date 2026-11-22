@@ -66,7 +66,7 @@ final class UpdateChecker: ObservableObject {
         self.autoCheck = (defaults?.object(forKey: "autoUpdateCheck") as? Bool) ?? false   // ausdrücklich: ohne Einstellung AUS
     }
 
-    var currentText: String { current.map { "v\($0)" } ?? "Entwicklerversion" }
+    var currentText: String { current.map { "v\($0)" } ?? String(localized: "Entwicklerversion") }
 
     /// Beim Start: nur wenn eingeschaltet und die letzte Prüfung über 24 h her ist.
     func checkAutomaticallyIfDue(now: Date = Date()) async {
@@ -77,7 +77,7 @@ final class UpdateChecker: ObservableObject {
 
     func check(now: Date = Date()) async {
         guard state != .checking else { return }
-        guard let current else { state = .failed("Eigene Versionsnummer unbekannt."); return }
+        guard let current else { state = .failed(String(localized: "Eigene Versionsnummer unbekannt.")); return }
         state = .checking
         do {
             var request = URLRequest(url: URL(string: "https://api.github.com/repos/\(Self.repository)/releases?per_page=20")!)
@@ -109,7 +109,7 @@ final class UpdateChecker: ObservableObject {
                 state = .upToDate
             }
         } catch {
-            state = .failed("Update-Prüfung fehlgeschlagen: \(error.localizedDescription)")
+            state = .failed(String(localized: "Update-Prüfung fehlgeschlagen: \(error.localizedDescription)"))
         }
     }
 
@@ -124,12 +124,12 @@ final class UpdateChecker: ObservableObject {
     /// Wo die laufende App liegt – und ob sie sich dort selbst ersetzen darf.
     var installLocation: URL { Bundle.main.bundleURL }
     var selfUpdateBlocker: String? {
-        if Bundle.main.bundleIdentifier != Self.bundleID { return "Entwicklerversion – bitte neu bauen statt aktualisieren." }
+        if Bundle.main.bundleIdentifier != Self.bundleID { return String(localized: "Entwicklerversion – bitte neu bauen statt aktualisieren.") }
         if installLocation.path.contains("/AppTranslocation/") {
-            return "macOS startet die App aus einem schreibgeschützten Ort. Bitte nach „Programme“ verschieben und neu öffnen."
+            return String(localized: "macOS startet die App aus einem schreibgeschützten Ort. Bitte nach „Programme“ verschieben und neu öffnen.")
         }
         if !FileManager.default.isWritableFile(atPath: installLocation.deletingLastPathComponent().path) {
-            return "Keine Schreibrechte für \(installLocation.deletingLastPathComponent().path)."
+            return String(localized: "Keine Schreibrechte für \(installLocation.deletingLastPathComponent().path).")
         }
         return nil
     }
@@ -145,26 +145,26 @@ final class UpdateChecker: ObservableObject {
         defer { try? FileManager.default.removeItem(at: work) }
         do {
             try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
-            state = .installing("Lade \(version) herunter …")
+            state = .installing(String(localized: "Lade \(version) herunter …"))
             let zip = try await SafeDownloader().download(asset.zip, to: work.appendingPathComponent("update.zip"))
             let sumFile = try await SafeDownloader().download(asset.checksum, to: work.appendingPathComponent("update.sha256"))
             guard let expectedSHA = SelfUpdate.parseChecksum(try String(contentsOf: sumFile, encoding: .utf8)) else { throw UpdateError.missingChecksum }
-            state = .installing("Prüfe Download …")
+            state = .installing(String(localized: "Prüfe Download …"))
             let staged = try await Task.detached {
                 try SelfUpdate.verifyAndStage(zip: zip, expectedSHA: expectedSHA, expectedVersion: expected,
                                               bundleID: UpdateChecker.bundleID, workDir: work)
             }.value
-            state = .installing("Installiere …")
+            state = .installing(String(localized: "Installiere …"))
             try SelfUpdate.replace(current: target, with: staged) { old in
                 var trashed: NSURL?
                 try FileManager.default.trashItem(at: old, resultingItemURL: &trashed)
                 return (trashed as URL?) ?? old
             }
-            state = .installing("Starte neu …")
+            state = .installing(String(localized: "Starte neu …"))
             try SelfUpdate.relaunch(at: target)
             NSApp.terminate(nil)
         } catch {
-            state = .failed("Update nicht installiert: \(error.localizedDescription) Die bisherige Version bleibt erhalten.")
+            state = .failed(String(localized: "Update nicht installiert: \(error.localizedDescription) Die bisherige Version bleibt erhalten."))
         }
     }
 
@@ -183,14 +183,14 @@ enum UpdateError: LocalizedError {
     case missingChecksum, checksumMismatch, badArchive, wrongBundle, wrongVersion(String), badSignature, download(Int), redirectBlocked
     var errorDescription: String? {
         switch self {
-        case .missingChecksum: return "Prüfsummendatei fehlt oder ist unlesbar."
-        case .checksumMismatch: return "Die Prüfsumme des Downloads stimmt nicht."
-        case .badArchive: return "Das Archiv enthält nicht genau eine App."
-        case .wrongBundle: return "Das Archiv enthält nicht Phantom Remote."
-        case .wrongVersion(let found): return "Das Archiv enthält Version \(found) statt der erwarteten."
-        case .badSignature: return "Die Code-Signatur der neuen App ist beschädigt."
-        case .download(let code): return "Download fehlgeschlagen (HTTP \(code))."
-        case .redirectBlocked: return "Download-Weiterleitung zu einem fremden Server blockiert."
+        case .missingChecksum: return String(localized: "Prüfsummendatei fehlt oder ist unlesbar.")
+        case .checksumMismatch: return String(localized: "Die Prüfsumme des Downloads stimmt nicht.")
+        case .badArchive: return String(localized: "Das Archiv enthält nicht genau eine App.")
+        case .wrongBundle: return String(localized: "Das Archiv enthält nicht Phantom Remote.")
+        case .wrongVersion(let found): return String(localized: "Das Archiv enthält Version \(found) statt der erwarteten.")
+        case .badSignature: return String(localized: "Die Code-Signatur der neuen App ist beschädigt.")
+        case .download(let code): return String(localized: "Download fehlgeschlagen (HTTP \(code)).")
+        case .redirectBlocked: return String(localized: "Download-Weiterleitung zu einem fremden Server blockiert.")
         }
     }
 }

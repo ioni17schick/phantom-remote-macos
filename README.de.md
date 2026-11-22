@@ -1,4 +1,6 @@
-# Phantom Remote for macOS — Unofficial
+# Phantom Remote für macOS — inoffiziell
+
+🇬🇧 [English version](README.md)
 
 Eine kleine, **inoffizielle Beta-Fernbedienung** für Devialet-Phantom-Lautsprecher mit DOS 2 und IP-Control-API. Native macOS-App mit Fenster, Menüleiste und globalen Tastenkürzeln.
 
@@ -19,6 +21,7 @@ Es gab bislang **kein unabhängiges menschliches Code-Audit**. Automatisierte Te
 - Nachtmodus, Equalizer und Balance, soweit die Firmware die entsprechenden Endpunkte anbietet.
 - Identifizierungston pro Lautsprecher und Prüfung seiner HTTP-Erreichbarkeit. Die angezeigten Millisekunden sind HTTP-Antwortzeiten, kein ICMP-Ping.
 - Frei veränderbares Fenster ohne Scrollen: Schrift, Rad, Lautsprecher, Knöpfe und Abstände skalieren mit der Fenstergröße. Klein nur das Lautstärkerad, normal die volle Steuerung, groß bzw. im Vollbild drei Spalten mit „Now Playing“ und großen Zurück/Play/Weiter-Knöpfen (sofern die Quelle sie anbietet). Wird es knapp, verkleinert die App zuerst und lässt erst dann Hinweise und zuletzt Karten weg.
+- Oberfläche auf **Deutsch und Englisch**; die App folgt der Systemsprache (andere Sprachen → Englisch).
 - Menüleistensteuerung und globale Kürzel: **⌃⌥↑**, **⌃⌥↓**, **⌃⌥M**.
 - Sichtbare Fehlermeldungen. Fehlgeschlagene Befehle werden nicht als erfolgreich bestätigt.
 - Update-Prüfung per Knopf (Fußzeile oder App-Menü „Nach Updates suchen …“), optional täglich automatisch. Ab 0.1.4 installiert **„Update installieren“** die neue Version direkt in der App und startet neu – nur auf Knopfdruck, nie still im Hintergrund (Details unter „Selbst-Update“).
@@ -152,6 +155,8 @@ Das Paketwerkzeug erstellt `dist/phantom-remote-source-0.1.0-beta.zip` aus einer
 | `Core.swift` | Zustände, feste Gerätezuordnung, geordnete Befehle |
 | `Views.swift` | Oberfläche und eigenständige neutrale Lautsprechergrafik |
 | `App.swift` | App-Fenster, Menüleiste, Menüs |
+| `Resources/*.lproj` | Übersetzungen (Schlüssel = deutscher Text, `en.lproj` = Englisch) |
+| `scripts/check_localization.py` | Prüft per Compiler, dass jeder sichtbare Text übersetzt ist |
 | `Tests/RegressionTests.swift` | Isolierte Regressionstests |
 | `build.sh`, `test.sh` | Build und Tests ohne Paketabhängigkeiten |
 

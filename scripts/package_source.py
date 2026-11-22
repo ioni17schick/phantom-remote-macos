@@ -8,11 +8,12 @@ import zipfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 FILES = [
     '.gitignore', 'App.swift', 'Core.swift', 'Discovery.swift', 'Models.swift',
-    'Views.swift', 'Updates.swift', 'make_icon.swift', 'build.sh', 'test.sh', 'README.md',
+    'Views.swift', 'Updates.swift', 'make_icon.swift', 'build.sh', 'test.sh', 'README.md', 'README.de.md',
     'LICENSE', 'CONTRIBUTING.md', 'SECURITY.md', 'CHANGELOG.md',
     'Tests/RegressionTests.swift', '.github/workflows/ci.yml',
     'scripts/package_source.py', 'scripts/release.sh',
     '.github/workflows/release.yml', '.github/release-notes.md',
+    'Resources/en.lproj/Localizable.strings', 'Resources/de.lproj/Localizable.strings', 'scripts/check_localization.py',
 ]
 
 def main():

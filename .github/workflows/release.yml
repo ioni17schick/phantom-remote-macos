@@ -20,6 +20,8 @@ jobs:
           xcrun swiftc --version
       - name: Regression tests (mock transport only)
         run: ./test.sh
+      - name: Localization coverage (German/English)
+        run: python3 scripts/check_localization.py
       - name: Publication checks
         run: python3 scripts/package_source.py --check
       - name: Universal app build

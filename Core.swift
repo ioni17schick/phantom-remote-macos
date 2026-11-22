@@ -5,13 +5,13 @@ import Carbon.HIToolbox
 struct SourceInfo { let label: String; let icon: String; let hint: String }
 func sourceInfo(_ type: String) -> SourceInfo {
     switch type {
-    case "opticaljack", "optical": return .init(label: "Optisch", icon: "cable.connector", hint: "Digitaler Eingang")
+    case String(localized: "opticaljack"), String(localized: "optical"): return .init(label: String(localized: "Optisch"), icon: String(localized: "cable.connector"), hint: String(localized: "Digitaler Eingang"))
     case "airplay2": return .init(label: "AirPlay", icon: "airplayaudio", hint: "Mac, iPhone")
     case "spotifyconnect": return .init(label: "Spotify", icon: "music.note", hint: "Spotify Connect")
-    case "bluetooth": return .init(label: "Bluetooth", icon: "dot.radiowaves.left.and.right", hint: "Vom Zuspieler starten")
+    case String(localized: "bluetooth"): return .init(label: "Bluetooth", icon: String(localized: "dot.radiowaves.left.and.right"), hint: String(localized: "Vom Zuspieler starten"))
     case "upnp": return .init(label: "UPnP", icon: "network", hint: "DLNA")
     case "raat": return .init(label: "Roon", icon: "waveform", hint: "Roon Ready")
-    case "line": return .init(label: "Line-In", icon: "cable.connector.horizontal", hint: "Analoger Eingang")
+    case String(localized: "line"): return .init(label: "Line-In", icon: String(localized: "cable.connector.horizontal"), hint: String(localized: "Analoger Eingang"))
     default: return .init(label: type.isEmpty ? "–" : type, icon: "speaker.wave.2", hint: "")
     }
 }
@@ -51,7 +51,7 @@ final class Phantom: ObservableObject {
     @Published private(set) var supportsBalance = false
     @Published private(set) var eqPresets: [String] = []
     @Published private(set) var eqRange: ClosedRange<Double> = -6...6
-    @Published private(set) var status = "Bitte ein System auswählen"
+    @Published private(set) var status = String(localized: "Bitte ein System auswählen")
     @Published var errorMessage: String?
     @Published var volumeLimit: Int = 60 {
         didSet {
@@ -151,7 +151,7 @@ final class Phantom: ObservableObject {
             target = Target(systemID: system, deviceID: verified.id, endpoint: verified.endpoint)
             endpoints[verified.id] = verified.endpoint
             online = false; everConnected = false; speakers = []; sources = []; pingMs = [:]
-            systemName = verified.systemName; status = "Verbinde …"; errorMessage = nil
+            systemName = verified.systemName; status = String(localized: "Verbinde …"); errorMessage = nil
             persist(); deviceSheet = false
         } catch { errorMessage = error.localizedDescription }
         connecting = false
@@ -161,7 +161,7 @@ final class Phantom: ObservableObject {
         guard !busy else { return }
         revision += 1; target = nil; online = false; everConnected = false
         speakers = []; sources = []; pingMs = [:]; systemName = "Phantom Remote"
-        status = "Bitte ein System auswählen"; defaults?.removeObject(forKey: "selectedTarget")
+        status = String(localized: "Bitte ein System auswählen"); defaults?.removeObject(forKey: "selectedTarget")
         deviceSheet = true
     }
 
@@ -202,12 +202,12 @@ final class Phantom: ObservableObject {
                 if let bands = eq.customEqualization { eqLow = Double(bands.low.gain); eqHigh = Double(bands.high.gain) }
             }
             if let bal { balance = Double(bal.balance) }
-            status = "Verbunden"
+            status = String(localized: "Verbunden")
             await pingSpeakers()
         } catch {
             guard version == revision, selected == target else { return }
-            if online && errorMessage == nil { errorMessage = "Verbindung zum Lautsprecher verloren (\(error.localizedDescription))." }
-            online = false; status = "Nicht erreichbar – Geräte prüfen"
+            if online && errorMessage == nil { errorMessage = String(localized: "Verbindung zum Lautsprecher verloren (\(error.localizedDescription)).") }
+            online = false; status = String(localized: "Nicht erreichbar – Geräte prüfen")
             pingMs = Dictionary(uniqueKeysWithValues: speakers.map { ($0.id, nil as Int?) })
             if case RemoteError.wrongDevice = error { errorMessage = error.localizedDescription }
         }
@@ -251,14 +251,14 @@ final class Phantom: ObservableObject {
     func sendVolume() {
         let value = VolumePolicy.clamp(volume)
         let token = UUID(); volumeToken = token
-        enqueue("Lautstärke") { [self] selected in
+        enqueue(String(localized: "Lautstärke")) { [self] selected in
             try await Task.sleep(for: .milliseconds(80))
             guard token == volumeToken else { return }
             try await setVolume(value, target: selected)
         }
     }
     func step(_ delta: Int, hud: Bool = true) async {
-        await enqueue("Lautstärke") { [self] selected in
+        await enqueue(String(localized: "Lautstärke")) { [self] selected in
             let actual = try await api.get(selected.endpoint, "/systems/current/sources/current/soundControl/volume", as: DVolume.self).volume
             let safe = VolumePolicy.requested(actual + delta, current: actual, limit: volumeLimit)
             try await api.post(selected.endpoint, "/systems/current/sources/current/soundControl/volume", body: body(["volume": safe]))
@@ -267,7 +267,7 @@ final class Phantom: ObservableObject {
         }?.value
     }
     func toggleMute(hud: Bool = true) async {
-        await enqueue("Stummschaltung") { [self] selected in
+        await enqueue(String(localized: "Stummschaltung")) { [self] selected in
             let current = try await api.get(selected.endpoint, "/groups/current/sources/current", as: DCurrent.self)
             let value = current.muteState != "muted"
             try await api.post(selected.endpoint, "/groups/current/sources/current/playback/" + (value ? "mute" : "unmute"))
@@ -276,7 +276,7 @@ final class Phantom: ObservableObject {
         }?.value
     }
     private func transport(_ requested: String?) async {
-        await enqueue("Wiedergabe") { [self] selected in
+        await enqueue(String(localized: "Wiedergabe")) { [self] selected in
             let current = try await api.get(selected.endpoint, "/groups/current/sources/current", as: DCurrent.self)
             let operation = requested ?? (current.playingState == "playing" ? "pause" : "play")
             guard current.availableOperations?.contains(operation) == true else { throw RemoteError.unsupported }
@@ -287,7 +287,7 @@ final class Phantom: ObservableObject {
     func next() async { await transport("next") }
     func previous() async { await transport("previous") }
     func select(_ source: DSource) async {
-        await enqueue("Quelle") { [self] selected in
+        await enqueue(String(localized: "Quelle")) { [self] selected in
             let live = try await api.get(selected.endpoint, "/groups/current/sources", as: DSources.self)
             guard live.sources.contains(source), ["opticaljack", "line"].contains(source.type),
                   !source.sourceId.isEmpty, source.sourceId.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" }) else { throw RemoteError.unsupported }
@@ -296,7 +296,7 @@ final class Phantom: ObservableObject {
     }
     func setNight(_ value: Bool) async {
         guard supportsNight, value != nightMode else { return }   // keine Schreibbefehle ohne echte Änderung
-        await enqueue("Nachtmodus") { [self] selected in
+        await enqueue(String(localized: "Nachtmodus")) { [self] selected in
             try await api.post(selected.endpoint, "/systems/current/settings/audio/nightMode", body: body(["nightMode": value ? "on" : "off"]))
             nightMode = value
         }?.value
@@ -353,7 +353,7 @@ final class Phantom: ObservableObject {
         guard canControl, !identifying.contains(device.id), !identifyQueued.contains(device.id), let selected = target else { return }
         guard let endpoint = device.id == selected.deviceID ? selected.endpoint : endpoints[device.id] else { errorMessage = RemoteError.missingEndpoint.localizedDescription; return }
         identifyQueued.insert(device.id)
-        enqueue("Identifizieren") { [self] selected in
+        enqueue(String(localized: "Identifizieren")) { [self] selected in
             defer { identifyQueued.remove(device.id) }
             let actual = try await api.get(endpoint, "/devices/current", as: DDevice.self)
             guard actual.deviceId == device.id, actual.systemId == selected.systemID else { throw RemoteError.wrongDevice }
@@ -383,7 +383,7 @@ final class Phantom: ObservableObject {
     }
     var selectableSources: [DSource] { uniqueSources.filter { ["opticaljack", "line"].contains($0.type) } }
     func sourceLabel(_ source: DSource) -> String {
-        let name = speakers.first { $0.id == source.deviceId }?.deviceName ?? "Gerät"
+        let name = speakers.first { $0.id == source.deviceId }?.deviceName ?? String(localized: "Gerät")
         return "\(sourceInfo(source.type).label) · \(name)"
     }
 }
@@ -398,7 +398,7 @@ enum HUD {
             VStack(spacing: 12) {
                 Image(systemName: muted ? "speaker.slash.fill" : "hifispeaker.2.fill").font(.system(size: 38, weight: .light))
                 ProgressView(value: Double(muted ? 0 : volume), total: 100).tint(.white).frame(width: 150)
-                Text(muted ? "Stumm" : "\(volume)").font(.system(size: 22, weight: .light, design: .rounded).monospacedDigit())
+                Text(muted ? String(localized: "Stumm") : String(localized: "\(volume)")).font(.system(size: 22, weight: .light, design: .rounded).monospacedDigit())
             }
             .foregroundStyle(.white)
             .padding(22)
@@ -440,7 +440,7 @@ enum Hotkeys {
             return noErr
         }, 1, &spec, nil, nil)
         guard handlerStatus == noErr else {
-            Phantom.shared.errorMessage = "Globale Tastenkürzel konnten nicht eingerichtet werden (\(handlerStatus))."
+            Phantom.shared.errorMessage = String(localized: "Globale Tastenkürzel konnten nicht eingerichtet werden (\(handlerStatus)).")
             return
         }
         var failed: [String] = []
@@ -452,7 +452,7 @@ enum Hotkeys {
             if status == noErr, let ref { refs.append(ref) } else { failed.append(name) }
         }
         if !failed.isEmpty {
-            Phantom.shared.errorMessage = "Bereits von einer anderen App belegt: \(failed.joined(separator: ", ")). Die übrigen Kürzel und die Fensterbedienung funktionieren."
+            Phantom.shared.errorMessage = String(localized: "Bereits von einer anderen App belegt: \(failed.joined(separator: ", ")). Die übrigen Kürzel und die Fensterbedienung funktionieren.")
         }
     }
     /// Registrierte Kürzel wieder freigeben (beim Beenden).

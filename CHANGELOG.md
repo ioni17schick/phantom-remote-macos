@@ -1,5 +1,13 @@
 # Changelog
 
+Entries from 0.1.7 on are in English; older entries are in German.
+
+## 0.1.7-beta — 2026-11-22
+
+- **English user interface.** The app follows the macOS system language: German stays German, every other language gets English. Per-app language can be set in System Settings → General → Language & Region.
+- All visible texts (139 keys) are extracted by the Swift compiler; `scripts/check_localization.py` fails CI on any missing or unused translation or placeholder mismatch.
+- README, CONTRIBUTING, SECURITY and release notes in English; German README kept as `README.de.md`.
+
 ## 0.1.6-beta — 2026-11-22
 
 - Skalieren wieder flüssig: Statt bis zu sieben Varianten bei jeder Größenänderung aufzubauen und auszumessen, wird der Maßstab direkt berechnet (verfügbare Höhe ÷ gemessene Inhaltshöhe) – eine einzige Oberfläche.

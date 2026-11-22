@@ -1,11 +1,11 @@
-# Sicherheit und Fehlerberichte
+# Security and bug reports
 
-Experimentelle Beta, kein professionell auditiertes Produkt. Es gibt keine Zusage von Reaktionszeiten oder Langzeitsupport.
+Experimental beta, not a professionally audited product. No guaranteed response times or long-term support.
 
-Die Devialet-IP-Control-API läuft lokal über unverschlüsseltes HTTP ohne Authentifizierung. Die App lehnt HTTP-Weiterleitungen ab und prüft Geräte- und System-ID vor Schreiboperationen. Diese Prüfungen sind keine kryptografische Authentifizierung. Nur in vertrauenswürdigen Netzen betreiben; keine API-Ports ins Internet freigeben.
+The Devialet IP Control API runs over unencrypted HTTP without authentication on the local network. The app rejects HTTP redirects to the speakers and checks device and system ID before every write. These checks are not cryptographic authentication. Run it only on trusted networks; never expose the API port to the internet.
 
-Das Selbst-Update (ab 0.1.4) lädt nur Release-Assets dieses Repositorys, prüft SHA-256, Bundle-ID, Version und Code-Signatur und läuft nur auf Knopfdruck. Es umgeht die Gatekeeper-Nachfrage (keine Quarantäne-Markierung) und vertraut damit dem GitHub-Konto des Projekts; die Herkunft eines Downloads lässt sich zusätzlich mit `gh attestation verify` prüfen.
+The self-update only downloads release assets of this repository, verifies SHA-256, bundle ID, version and code signature, and runs only when the user clicks. It skips the Gatekeeper prompt (no quarantine flag) and therefore trusts the project’s GitHub account; a download’s origin can additionally be checked with `gh attestation verify`.
 
-Die App erzeugt keine Telemetrie und enthält keine Zugangsdaten. Geräteadressen und IDs werden lokal in UserDefaults gespeichert. Vor Fehlerberichten private Details entfernen.
+The app sends no telemetry and contains no credentials. Device addresses and IDs are stored locally in UserDefaults. Remove private details before filing reports.
 
-Sicherheitsprobleme mit reproduzierbaren, anonymisierten Beispielen melden. Falls das spätere GitHub-Repository private Vulnerability Reports anbietet, diese verwenden. Keine personenbezogenen Daten oder Zugangsdaten in öffentliche Issues stellen.
+Report security issues with reproducible, anonymized examples. Use GitHub’s private vulnerability reporting if available. Never put personal data or credentials into public issues.

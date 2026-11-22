@@ -20,6 +20,12 @@ for size in 16 32 128 256 512; do
   sips -z "$((size*2))" "$((size*2))" "$BUILD/icon_1024.png" --out "$BUILD/AppIcon.iconset/icon_${size}x${size}@2x.png" >/dev/null
 done
 iconutil -c icns "$BUILD/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
+# Sprachen: Deutsch (Entwicklungssprache, Schlüssel = deutscher Text) und Englisch
+for lang in de en; do
+  mkdir -p "$APP/Contents/Resources/$lang.lproj"
+  cp "Resources/$lang.lproj/Localizable.strings" "$APP/Contents/Resources/$lang.lproj/"
+  plutil -lint -s "$APP/Contents/Resources/$lang.lproj/Localizable.strings"
+done
 for arch in arm64 x86_64; do
   xcrun swiftc "${SWIFT_FLAGS[@]}" -O -target "$arch-apple-macos14" "${SOURCES[@]}" App.swift -o "$BUILD/PhantomRemote-$arch"
 done
@@ -33,9 +39,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleDisplayName</key><string>Phantom Remote (Unofficial)</string>
 <key>CFBundleExecutable</key><string>PhantomRemote</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
+<key>CFBundleDevelopmentRegion</key><string>de</string>
+<key>CFBundleLocalizations</key><array><string>de</string><string>en</string></array>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.6</string>
-<key>CFBundleVersion</key><string>7</string>
+<key>CFBundleShortVersionString</key><string>0.1.7</string>
+<key>CFBundleVersion</key><string>8</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
 <key>NSHighResolutionCapable</key><true/>

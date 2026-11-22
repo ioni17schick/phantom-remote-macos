@@ -53,14 +53,14 @@ enum RemoteError: LocalizedError {
     case invalidAddress, http(Int), invalidIdentity, wrongDevice, notLeader, noConnection, missingEndpoint, unsupported
     var errorDescription: String? {
         switch self {
-        case .invalidAddress: return "Bitte eine IP-Adresse oder einen Hostnamen eingeben, optional mit Port (1–65535)."
-        case .http(let code): return "Der Lautsprecher hat den Befehl abgelehnt (HTTP \(code))."
-        case .invalidIdentity: return "Die Antwort enthält keine eindeutige Geräte- und Systemkennung."
-        case .wrongDevice: return "Unter dieser Adresse antwortet ein anderes Gerät oder System. Bitte die Auswahl prüfen."
-        case .notLeader: return "Dieser Lautsprecher ist kein System-Leader. Er wurde gespeichert; bitte den Leader des Paars auswählen."
-        case .noConnection: return "Keine bestätigte Verbindung. Bitte erst verbinden oder erneut prüfen."
-        case .missingEndpoint: return "Adresse dieses Lautsprechers unbekannt. Bitte mDNS-Suche starten oder seine IP unter Geräte hinzufügen."
-        case .unsupported: return "Diese Funktion wird von der aktuellen Quelle oder Firmware nicht angeboten."
+        case .invalidAddress: return String(localized: "Bitte eine IP-Adresse oder einen Hostnamen eingeben, optional mit Port (1–65535).")
+        case .http(let code): return String(localized: "Der Lautsprecher hat den Befehl abgelehnt (HTTP \(code)).")
+        case .invalidIdentity: return String(localized: "Die Antwort enthält keine eindeutige Geräte- und Systemkennung.")
+        case .wrongDevice: return String(localized: "Unter dieser Adresse antwortet ein anderes Gerät oder System. Bitte die Auswahl prüfen.")
+        case .notLeader: return String(localized: "Dieser Lautsprecher ist kein System-Leader. Er wurde gespeichert; bitte den Leader des Paars auswählen.")
+        case .noConnection: return String(localized: "Keine bestätigte Verbindung. Bitte erst verbinden oder erneut prüfen.")
+        case .missingEndpoint: return String(localized: "Adresse dieses Lautsprechers unbekannt. Bitte mDNS-Suche starten oder seine IP unter Geräte hinzufügen.")
+        case .unsupported: return String(localized: "Diese Funktion wird von der aktuellen Quelle oder Firmware nicht angeboten.")
         }
     }
 }
