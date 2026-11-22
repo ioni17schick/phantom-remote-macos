@@ -1,0 +1,46 @@
+name: Release (unsigned beta)
+# Baut die App aus dem getaggten Quellcode auf GitHub, nicht auf einem privaten Rechner.
+# Die App ist nur ad hoc signiert und NICHT von Apple notarisiert (siehe README).
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write       # Release anlegen
+  id-token: write       # Herkunftsnachweis (Build Provenance)
+  attestations: write
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select newest installed Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcrun swiftc --version
+      - name: Regression tests (mock transport only)
+        run: ./test.sh
+      - name: Publication checks
+        run: python3 scripts/package_source.py --check
+      - name: Universal app build
+        run: ./build.sh
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ZIP="Phantom-Remote-${VERSION}-unsigned.zip"
+          ditto -c -k --keepParent ".build/Phantom Remote.app" "$ZIP"
+          shasum -a 256 "$ZIP" > "$ZIP.sha256"
+          lipo -archs ".build/Phantom Remote.app/Contents/MacOS/PhantomRemote"
+          echo "ZIP=$ZIP" >> "$GITHUB_ENV"
+      - name: Build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: ${{ env.ZIP }}
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRE=""; [[ "$GITHUB_REF_NAME" == *-* ]] && PRE="--prerelease"
+          gh release create "$GITHUB_REF_NAME" "$ZIP" "$ZIP.sha256" $PRE \
+            --title "Phantom Remote ${GITHUB_REF_NAME}" \
+            --notes-file .github/release-notes.md

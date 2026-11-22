@@ -29,6 +29,25 @@ Es gab bislang **kein unabhängiges menschliches Code-Audit**. Automatisierte Te
 - Phantom mit DOS 2 und aktivem HTTP-IP-Control-Endpunkt, üblicherweise TCP-Port 80. DOS 1 / Spark wird nicht unterstützt.
 - Ausgangspunkt der Entwicklung war ein **Phantom-II-95-dB-Stereopaar mit DOS 2.21.2**. Einzelne API-Funktionen wurden dort geprüft. Die Beta wird zusätzlich mit einem simulierten Transport getestet. Andere Geräte, alle Firmwarestände, Intel-Macs und sämtliche macOS-Versionen wurden **nicht** vollständig praktisch getestet.
 
+## Download (Beta, nicht notarisiert)
+
+Unter [Releases](https://github.com/ioni17schick/phantom-remote-macos/releases) gibt es eine fertige Universal-App als `Phantom-Remote-<Version>-unsigned.zip`.
+
+**Wichtig:** Die App ist nur *ad hoc* signiert und **nicht von Apple notarisiert** (keine Developer-ID). macOS blockiert sie deshalb beim ersten Start. Sie wird von GitHub Actions direkt aus dem getaggten Quellcode gebaut, nicht auf einem privaten Rechner; Herkunft und Integrität lassen sich prüfen:
+
+```sh
+shasum -a 256 -c Phantom-Remote-*-unsigned.zip.sha256
+gh attestation verify Phantom-Remote-*-unsigned.zip --repo ioni17schick/phantom-remote-macos
+```
+
+Öffnen (macOS 15 und neuer):
+
+1. Zip entpacken, **Phantom Remote.app** nach *Programme* ziehen und einmal doppelklicken. macOS meldet, dass die App nicht überprüft werden kann → **Fertig**.
+2. **Systemeinstellungen → Datenschutz & Sicherheit**, ganz nach unten scrollen → bei „Phantom Remote“ **Trotzdem öffnen** → mit Passwort bestätigen.
+3. Ab dann startet die App normal.
+
+Das ist eine bewusste Ausnahme von macOS-Schutzmechanismen. Nur machen, wenn du dem Projekt vertraust; sonst die App wie unten beschrieben selbst bauen – selbst gebaute Apps sind davon nicht betroffen.
+
 ## Bauen und starten
 
 ```sh
@@ -47,7 +66,17 @@ Optional installieren, nachdem die bisherige App über **Beenden** geschlossen w
 
 Das installiert nach `~/Applications/Phantom Remote.app`. Eine dort vorhandene Version wird als `.bak-beta-<Datum-Uhrzeit>` gesichert. Eine noch laufende Instanz verhindert die Installation.
 
-Lokale Builds sind **ad hoc signiert und nicht notarisiert**. Für öffentliche fertige App-Downloads wäre eine gesonderte Developer-ID-Signierung und Apple-Notarisierung erforderlich, um den üblichen reibungslosen Gatekeeper-Ablauf zu ermöglichen. Dieses Repository liefert zunächst Quellcode und einen lokalen Build, keine vorgeblich Apple-geprüfte Binärdatei.
+Lokale Builds sind **ad hoc signiert und nicht notarisiert**. Für öffentliche fertige App-Downloads wäre eine gesonderte Developer-ID-Signierung und Apple-Notarisierung erforderlich, um den üblichen reibungslosen Gatekeeper-Ablauf zu ermöglichen. Die Release-Downloads sind deshalb ausdrücklich als *unsigned* gekennzeichnet; es gibt keine vorgeblich Apple-geprüfte Binärdatei.
+
+## Signierte Release-Builds (für Maintainer)
+
+`scripts/release.sh` baut, signiert mit *Developer ID* und Hardened Runtime, lässt die App von Apple notarisieren und heftet das Ticket an. Ergebnis: `dist/Phantom-Remote-<Version>.zip` plus SHA-256-Datei. Einmalig nötig:
+
+1. Ein Zertifikat **Developer ID Application** im Schlüsselbund (Apple Developer Program, Rolle *Account Holder*).
+2. Gespeicherte Notarisierungs-Zugangsdaten, z. B. mit app-spezifischem Passwort:
+   `xcrun notarytool store-credentials phantom-notary --apple-id <Apple-ID> --team-id <TEAMID>`
+
+Das Skript bricht ohne Zertifikat oder Profil ab und veröffentlicht nichts selbst.
 
 ## Erste Verbindung
 

@@ -19,4 +19,5 @@ Erste zur öffentlichen Prüfung vorbereitete Version; noch kein veröffentlicht
 - Keine Schreibbefehle für unveränderten Nachtmodus oder unveränderte EQ-Voreinstellung.
 - Lautstärkelimit wird intern auf 0–100 begrenzt, nicht nur beim Speichern.
 - Fensterhöhe folgt dem Inhalt; Fußzeile und Fehlerbanner werden nicht abgeschnitten.
+- Unsignierter Universal-Download, gebaut von GitHub Actions mit Herkunftsnachweis (Build Provenance) und SHA-256.
 - 60 Regressionstests, u. a. für Werte-Begrenzung, untergeschobene Quellen-IDs, fremde System-IDs und vergessene Systeme.

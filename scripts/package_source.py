@@ -11,7 +11,8 @@ FILES = [
     'Views.swift', 'make_icon.swift', 'build.sh', 'test.sh', 'README.md',
     'LICENSE', 'CONTRIBUTING.md', 'SECURITY.md', 'CHANGELOG.md',
     'Tests/RegressionTests.swift', '.github/workflows/ci.yml',
-    'scripts/package_source.py',
+    'scripts/package_source.py', 'scripts/release.sh',
+    '.github/workflows/release.yml', '.github/release-notes.md',
 ]
 
 def main():
