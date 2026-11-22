@@ -1,0 +1,8 @@
+.build/
+dist/
+.DS_Store
+*.bak-*
+old/
+Assets/
+*.xcuserstate
+xcuserdata/

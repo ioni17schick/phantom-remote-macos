@@ -1,0 +1,20 @@
+name: macOS checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select newest installed Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcrun swiftc --version
+      - name: Regression tests (mock transport only)
+        run: ./test.sh
+      - name: Universal app build
+        run: ./build.sh
+      - name: Publication checks
+        run: python3 scripts/package_source.py --check
