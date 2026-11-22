@@ -159,3 +159,15 @@ enum VolumePolicy {
         min(max(0, min(100, value)), max(current, limit))
     }
 }
+
+/// Welche Ansicht bei welcher Fenstergröße: klein = nur Lautstärke, groß/Vollbild = „Now Playing“.
+enum LayoutMode: Equatable, Sendable {
+    case compact, regular, large
+    static let compactBelow = (width: 640.0, height: 600.0)
+    static let largeFrom = (width: 1100.0, height: 780.0)
+    init(width: Double, height: Double) {
+        if width < Self.compactBelow.width || height < Self.compactBelow.height { self = .compact }
+        else if width >= Self.largeFrom.width && height >= Self.largeFrom.height { self = .large }
+        else { self = .regular }
+    }
+}

@@ -311,6 +311,12 @@ actor GitHubMock: RemoteTransport {
         await auto.checkAutomaticallyIfDue(now: t0.addingTimeInterval(25 * 3600))
         let afterDay = await gh.count()
         expect(afterDay == ghBefore + 2, "automatic check runs again after 24 hours")
+        // --- Fenstergrößen → Ansicht ---
+        expect(LayoutMode(width: 300, height: 360) == .compact, "small window shows only the volume control")
+        expect(LayoutMode(width: 1200, height: 500) == .compact, "wide but flat window stays compact")
+        expect(LayoutMode(width: 780, height: 800) == .regular, "default window size shows the regular view")
+        expect(LayoutMode(width: 1099, height: 1000) == .regular, "just below the large threshold stays regular")
+        expect(LayoutMode(width: 1440, height: 900) == .large && LayoutMode(width: 1920, height: 1080) == .large, "full screen shows now playing")
         print("\(checks) checks passed. Mock transport only; no physical devices contacted.")
     }
 }

@@ -18,6 +18,7 @@ Es gab bislang **kein unabhängiges menschliches Code-Audit**. Automatisierte Te
 - Lautstärke, Stummschaltung, unterstützte Wiedergabebefehle und getrennte optische/analoge Eingänge pro Lautsprecher.
 - Nachtmodus, Equalizer und Balance, soweit die Firmware die entsprechenden Endpunkte anbietet.
 - Identifizierungston pro Lautsprecher und Prüfung seiner HTTP-Erreichbarkeit. Die angezeigten Millisekunden sind HTTP-Antwortzeiten, kein ICMP-Ping.
+- Frei veränderbares Fenster: klein nur das Lautstärkerad, normal die volle Steuerung, groß bzw. im Vollbild eine „Now Playing“-Ansicht mit Titel, Quelle und großen Zurück/Play/Weiter-Knöpfen (sofern die Quelle sie anbietet).
 - Menüleistensteuerung und globale Kürzel: **⌃⌥↑**, **⌃⌥↓**, **⌃⌥M**.
 - Sichtbare Fehlermeldungen. Fehlgeschlagene Befehle werden nicht als erfolgreich bestätigt.
 - Update-Prüfung per Knopf (Fußzeile oder App-Menü „Nach Updates suchen …“), optional täglich automatisch. Sie öffnet bei einer neuen Version nur die Release-Seite; die App installiert nichts selbst, weil sie nicht notarisiert ist.

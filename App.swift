@@ -23,7 +23,8 @@ struct PhantomRemoteApp: App {
             MainView()
         }
         .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)   // frei veränderbar inkl. Vollbild; Ansicht passt sich an
+        .defaultSize(width: 780, height: 800)
         .commands {
             CommandGroup(replacing: .newItem) {}
             CommandGroup(after: .appInfo) { CheckForUpdatesCommand() }

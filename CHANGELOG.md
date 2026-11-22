@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.3-beta — 2026-11-22
+
+- Fenster frei in der Größe veränderbar, inklusive Vollbild.
+- Klein (unter 640 × 600): nur Lautstärkerad, −/Stumm/+ und Status – das Rad füllt den Platz.
+- Normal: bisherige Ansicht, Karten passen sich der Breite an.
+- Groß/Vollbild (ab 1100 × 780): „Now Playing“ mit Quelle, Titel, Interpret, Format und großen Zurück/Play/Weiter-Knöpfen; nicht angebotene Funktionen sind ausgegraut und erklärt.
+- Lautstärkerad skaliert vollständig mit (Schrift, Ring, Skala).
+- 89 Regressionstests (inkl. Größen → Ansicht).
+
 ## 0.1.2-beta — 2026-11-22
 
 - Update-Prüfung: Knopf in der Fußzeile und App-Menü „Nach Updates suchen …“; optional einmal täglich automatisch (standardmäßig aus).

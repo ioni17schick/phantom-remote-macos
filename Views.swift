@@ -77,15 +77,16 @@ struct VolumeDial: View {
             ForEach(0..<41) { index in
                 Capsule().fill(.white.opacity(Double(index) / 40 <= fraction ? 0.8 : 0.15))
                     .frame(width: 2, height: index % 5 == 0 ? 10 : 5)
-                    .offset(y: -size / 2 + 8)
+                    .offset(y: -size / 2 + size * 0.033)
                     .rotationEffect(.degrees(-135 + 270 * Double(index) / 40))
             }
-            Circle().trim(from: 0, to: 0.75).stroke(.white.opacity(0.08), style: StrokeStyle(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(135)).padding(30)
-            Circle().trim(from: 0, to: 0.75 * fraction).stroke(Color.accentWarm, style: StrokeStyle(lineWidth: 5, lineCap: .round)).rotationEffect(.degrees(135)).padding(30)
-            VStack(spacing: 4) {
-                Text(p.muted ? "–" : "\(Int(p.volume))").font(.system(size: 64, weight: .ultraLight, design: .rounded)).monospacedDigit()
-                Text(p.muted ? "STUMM" : "LAUTSTÄRKE").font(.system(size: 10, weight: .semibold)).tracking(2).foregroundStyle(.secondary)
-                Text("Limit \(p.volumeLimit)").font(.system(size: 10)).foregroundStyle(Color.accentWarm.opacity(0.8))
+            let ring = max(4, size * 0.021)
+            Circle().trim(from: 0, to: 0.75).stroke(.white.opacity(0.08), style: StrokeStyle(lineWidth: ring, lineCap: .round)).rotationEffect(.degrees(135)).padding(size * 0.125)
+            Circle().trim(from: 0, to: 0.75 * fraction).stroke(Color.accentWarm, style: StrokeStyle(lineWidth: ring, lineCap: .round)).rotationEffect(.degrees(135)).padding(size * 0.125)
+            VStack(spacing: size * 0.016) {
+                Text(p.muted ? "–" : "\(Int(p.volume))").font(.system(size: size * 0.267, weight: .ultraLight, design: .rounded)).monospacedDigit()
+                Text(p.muted ? "STUMM" : "LAUTSTÄRKE").font(.system(size: max(9, size * 0.042), weight: .semibold)).tracking(2).foregroundStyle(.secondary)
+                Text("Limit \(p.volumeLimit)").font(.system(size: max(9, size * 0.042))).foregroundStyle(Color.accentWarm.opacity(0.8))
             }
         }
         .frame(width: size, height: size).contentShape(Circle())
@@ -143,74 +144,178 @@ struct ErrorBanner: View {
         }
     }
 }
-/// Gemessene Inhaltshöhe des Hauptfensters
-@MainActor final class ContentHeight: ObservableObject { @Published var value: CGFloat = 760 }
-private struct ContentHeightKey: PreferenceKey {
-    static let defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
-}
 struct MainView: View {
     @ObservedObject var p = Phantom.shared
-    @StateObject private var height = ContentHeight()
-    /// Fenster nie höher als der sichtbare Bildschirm; darüber hinaus wird gescrollt.
-    private var maxHeight: CGFloat { (NSScreen.main?.visibleFrame.height ?? 900) - 40 }
     var body: some View {
-        ScrollView {
-            VStack(spacing: 20) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(p.systemName).font(.system(size: 24, weight: .light)).tracking(2)
-                        Text(p.target == nil ? "Inoffizielle Fernbedienung · Beta" : "\(p.model) · \(p.speakers.count) Lautsprecher").font(.system(size: 11)).foregroundStyle(.secondary)
+        GeometryReader { geo in
+            let mode = LayoutMode(width: geo.size.width, height: geo.size.height)
+            Group {
+                if !p.everConnected { ScrollView { VStack(spacing: 20) { header; ErrorBanner(p: p); welcome; footer }.padding(26) } }
+                else {
+                    switch mode {
+                    case .compact: compact(geo.size)
+                    case .regular: regular
+                    case .large: large(geo.size)
                     }
-                    Spacer()
-                    Text(p.online ? "● Verbunden" : p.status).font(.system(size: 11)).foregroundStyle(p.online ? .green : .secondary)
-                    Button("Geräte …") { p.deviceSheet = true }.disabled(p.busy)
                 }
-                ErrorBanner(p: p)
-                if p.everConnected {
-                    HStack {
-                        if let first = p.speakers.first { SpeakerView(p: p, device: first) }
-                        Spacer(minLength: 0)
-                        VolumeDial(p: p).disabled(!p.canControl)
-                        Spacer(minLength: 0)
-                        if p.speakers.count > 1 { SpeakerView(p: p, device: p.speakers[1]) }
-                        else { Color.clear.frame(width: 155, height: 1) }
-                    }.opacity(p.online ? 1 : 0.45)
-                    HStack(spacing: 14) {
-                        RoundIconButton(icon: "minus") { Task { await p.step(-2, hud: false) } }.accessibilityLabel("Leiser")
-                        RoundIconButton(icon: p.muted ? "speaker.slash.fill" : "speaker.wave.2.fill", size: 46, active: p.muted) { Task { await p.toggleMute(hud: false) } }.accessibilityLabel("Stumm umschalten")
-                        RoundIconButton(icon: "plus") { Task { await p.step(2, hud: false) } }.accessibilityLabel("Lauter")
-                    }.disabled(!p.canControl)
-                    HStack(alignment: .top, spacing: 18) { playback; sound }
-                        .disabled(!p.canControl)
-                } else {
-                    VStack(spacing: 18) {
-                        PhantomGraphic(width: 170)
-                        Text("Wähle dein Phantom-System aus.").font(.title3)
-                        Text("Automatisch im lokalen Netzwerk suchen oder eine IP-Adresse eingeben.").font(.callout).foregroundStyle(.secondary)
-                        Button("Geräte auswählen") { p.deviceSheet = true }.buttonStyle(.borderedProminent).tint(.accentWarm).foregroundStyle(.black)
-                    }.frame(maxWidth: .infinity).padding(.vertical, 60)
-                }
-                HStack {
-                    Text("⌃⌥↑ / ↓ Lautstärke · ⌃⌥M Stumm").font(.system(size: 10)).foregroundStyle(.secondary)
-                    Spacer()
-                    if p.pending > 0 { ProgressView().controlSize(.small) }
-                    UpdateStatusView()
-                    Button("Verbindung prüfen") { Task { await p.refresh() } }.disabled(p.busy || p.target == nil).controlSize(.small)
-                }
-            }.padding(26)
-            .background(GeometryReader { g in Color.clear.preference(key: ContentHeightKey.self, value: g.size.height) })
+            }
+            .frame(width: geo.size.width, height: geo.size.height)
+            .animation(.easeInOut(duration: 0.25), value: mode)
         }
-        .onPreferenceChange(ContentHeightKey.self) { h in Task { @MainActor in if h > 0 { height.value = h } } }
-        // Höhe folgt dem Inhalt (Fehlerbanner, Gerätezahl), höchstens Bildschirmhöhe – dann scrollt das Fenster
-        .frame(width: 780, height: min(height.value, maxHeight))
+        .frame(minWidth: 280, idealWidth: 780, minHeight: 330, idealHeight: 800)
         .foregroundStyle(.white).environment(\.colorScheme, .dark)
         .background(LinearGradient(colors: [.bgTop, .bgBottom], startPoint: .top, endPoint: .bottom))
         .sheet(isPresented: $p.deviceSheet) { DevicesView(p: p) }
         .onAppear { p.viewAppeared() }.onDisappear { p.viewDisappeared() }
     }
-    var playback: some View {
-        Card(title: "Wiedergabe") {
+
+    // MARK: Klein – nur Lautstärke
+    func compact(_ size: CGSize) -> some View {
+        let dial = max(150, min(size.width - 40, size.height - 130))
+        return VStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Circle().fill(p.online ? Color.green : .orange).frame(width: 7, height: 7)
+                Text(p.systemName).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                Spacer()
+                Button { p.deviceSheet = true } label: { Image(systemName: "gearshape") }.buttonStyle(.plain).foregroundStyle(.secondary).help("Geräte …")
+            }
+            if let message = p.errorMessage {
+                Text(message).font(.system(size: 10)).foregroundStyle(Color.accentWarm).lineLimit(2).onTapGesture { p.errorMessage = nil }
+            }
+            Spacer(minLength: 0)
+            VolumeDial(p: p, size: dial).disabled(!p.canControl).opacity(p.online ? 1 : 0.45)
+            Spacer(minLength: 0)
+            volumeButtons(size: 34, mute: 42)
+        }
+        .padding(.horizontal, 18).padding(.top, 30).padding(.bottom, 18)
+    }
+
+    // MARK: Normal – bisherige Ansicht, flexibel in der Breite
+    var regular: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                header
+                ErrorBanner(p: p)
+                HStack {
+                    if let first = p.speakers.first { SpeakerView(p: p, device: first) }
+                    Spacer(minLength: 0)
+                    VolumeDial(p: p).disabled(!p.canControl)
+                    Spacer(minLength: 0)
+                    if p.speakers.count > 1 { SpeakerView(p: p, device: p.speakers[1]) }
+                    else { Color.clear.frame(width: 155, height: 1) }
+                }.opacity(p.online ? 1 : 0.45)
+                volumeButtons(size: 40, mute: 46)
+                HStack(alignment: .top, spacing: 18) { playback(showNowPlaying: true); sound }
+                    .disabled(!p.canControl)
+                footer
+            }.padding(26)
+        }
+    }
+
+    // MARK: Groß / Vollbild – Now Playing
+    func large(_ size: CGSize) -> some View {
+        let dial = min(420, max(260, size.height * 0.42))
+        return ScrollView {
+            VStack(spacing: 28) {
+                header
+                ErrorBanner(p: p)
+                HStack(alignment: .center, spacing: 48) {
+                    nowPlaying(art: min(300, size.height * 0.3))
+                        .frame(maxWidth: .infinity)
+                    VStack(spacing: 18) {
+                        VolumeDial(p: p, size: dial).disabled(!p.canControl).opacity(p.online ? 1 : 0.45)
+                        volumeButtons(size: 46, mute: 56)
+                        HStack(spacing: 24) { ForEach(p.speakers) { SpeakerView(p: p, device: $0) } }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                HStack(alignment: .top, spacing: 24) { playback(showNowPlaying: false); sound }
+                    .disabled(!p.canControl)
+                footer
+            }
+            .padding(.horizontal, 48).padding(.vertical, 36)
+            .frame(maxWidth: 1500)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// Große Wiedergabe-Ansicht: Quelle, Titel, Interpret, Format und Transport-Buttons.
+    func nowPlaying(art: CGFloat) -> some View {
+        let info = sourceInfo(p.currentType)
+        let canPrevious = p.ops.contains("previous"), canNext = p.ops.contains("next")
+        let playPause = p.playing ? "pause" : "play"
+        let canPlayPause = p.ops.contains(playPause)
+        return VStack(spacing: 22) {
+            ZStack {
+                RoundedRectangle(cornerRadius: art * 0.12)
+                    .fill(LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.03)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay(RoundedRectangle(cornerRadius: art * 0.12).stroke(.white.opacity(0.08)))
+                Image(systemName: info.icon).font(.system(size: art * 0.32, weight: .light)).foregroundStyle(Color.accentWarm)
+            }.frame(width: art, height: art)
+            VStack(spacing: 8) {
+                Text("JETZT LÄUFT").font(.system(size: 11, weight: .semibold)).tracking(2.5).foregroundStyle(.secondary)
+                Text(p.title.isEmpty ? info.label : p.title).font(.system(size: 30, weight: .semibold)).multilineTextAlignment(.center).lineLimit(2)
+                let detail = [p.artist, p.peer].filter { !$0.isEmpty }.joined(separator: " · ")
+                if !detail.isEmpty { Text(detail).font(.system(size: 17)).foregroundStyle(.secondary).lineLimit(1) }
+                if !p.codec.isEmpty { Text(p.codec).font(.system(size: 12, weight: .medium)).foregroundStyle(Color.accentWarm.opacity(0.85)) }
+            }
+            HStack(spacing: 26) {
+                RoundIconButton(icon: "backward.fill", size: 54) { Task { await p.previous() } }
+                    .disabled(!canPrevious).opacity(canPrevious ? 1 : 0.35).accessibilityLabel("Zurück")
+                RoundIconButton(icon: p.playing ? "pause.fill" : "play.fill", size: 76, active: canPlayPause) { Task { await p.playPause() } }
+                    .disabled(!canPlayPause).opacity(canPlayPause ? 1 : 0.35).accessibilityLabel(p.playing ? "Pause" : "Wiedergabe")
+                RoundIconButton(icon: "forward.fill", size: 54) { Task { await p.next() } }
+                    .disabled(!canNext).opacity(canNext ? 1 : 0.35).accessibilityLabel("Weiter")
+            }
+            .disabled(!p.canControl)
+            if !canPrevious && !canNext && !canPlayPause {
+                Text("\(info.label): Wiedergabe am Zuspieler steuern – diese Quelle bietet keine Fernsteuerung.")
+                    .font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            }
+        }
+    }
+
+    func volumeButtons(size: CGFloat, mute: CGFloat) -> some View {
+        HStack(spacing: size * 0.35) {
+            RoundIconButton(icon: "minus", size: size) { Task { await p.step(-2, hud: false) } }.accessibilityLabel("Leiser")
+            RoundIconButton(icon: p.muted ? "speaker.slash.fill" : "speaker.wave.2.fill", size: mute, active: p.muted) { Task { await p.toggleMute(hud: false) } }.accessibilityLabel("Stumm umschalten")
+            RoundIconButton(icon: "plus", size: size) { Task { await p.step(2, hud: false) } }.accessibilityLabel("Lauter")
+        }.disabled(!p.canControl)
+    }
+
+    var header: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(p.systemName).font(.system(size: 24, weight: .light)).tracking(2)
+                Text(p.target == nil ? "Inoffizielle Fernbedienung · Beta" : "\(p.model) · \(p.speakers.count) Lautsprecher").font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(p.online ? "● Verbunden" : p.status).font(.system(size: 11)).foregroundStyle(p.online ? .green : .secondary)
+            Button("Geräte …") { p.deviceSheet = true }.disabled(p.busy)
+        }
+    }
+
+    var welcome: some View {
+        VStack(spacing: 18) {
+            PhantomGraphic(width: 170)
+            Text("Wähle dein Phantom-System aus.").font(.title3)
+            Text("Automatisch im lokalen Netzwerk suchen oder eine IP-Adresse eingeben.").font(.callout).foregroundStyle(.secondary)
+            Button("Geräte auswählen") { p.deviceSheet = true }.buttonStyle(.borderedProminent).tint(.accentWarm).foregroundStyle(.black)
+        }.frame(maxWidth: .infinity).padding(.vertical, 60)
+    }
+
+    var footer: some View {
+        HStack {
+            Text("⌃⌥↑ / ↓ Lautstärke · ⌃⌥M Stumm").font(.system(size: 10)).foregroundStyle(.secondary)
+            Spacer()
+            if p.pending > 0 { ProgressView().controlSize(.small) }
+            UpdateStatusView()
+            Button("Verbindung prüfen") { Task { await p.refresh() } }.disabled(p.busy || p.target == nil).controlSize(.small)
+        }
+    }
+    func playback(showNowPlaying: Bool) -> some View {
+        Card(title: showNowPlaying ? "Wiedergabe" : "Quelle") {
+            if showNowPlaying {
             HStack {
                 Image(systemName: sourceInfo(p.currentType).icon).font(.title2).foregroundStyle(Color.accentWarm)
                 VStack(alignment: .leading, spacing: 4) {
@@ -227,6 +332,7 @@ struct MainView: View {
                     if p.ops.contains("next") { Button { Task { await p.next() } } label: { Image(systemName: "forward.fill") } }
                 }.buttonStyle(.bordered)
             }
+            }
             ForEach(p.selectableSources) { source in
                 Button { Task { await p.select(source) } } label: {
                     HStack {
@@ -239,7 +345,7 @@ struct MainView: View {
             }
             Button("Mac per AirPlay verbinden …") { p.openAirPlaySettings() }.controlSize(.small)
             Text("Spotify, Bluetooth, Roon und UPnP werden vom jeweiligen Zuspieler gestartet.").font(.system(size: 10)).foregroundStyle(.secondary)
-        }.frame(width: 380)
+        }.frame(minWidth: 0, maxWidth: .infinity)
     }
     var sound: some View {
         Card(title: "Klang") {
@@ -260,7 +366,7 @@ struct MainView: View {
             if !p.supportsNight && !p.supportsEq && !p.supportsBalance {
                 Text("Für dieses System sind keine Klangeinstellungen verfügbar.").font(.callout).foregroundStyle(.secondary)
             }
-        }
+        }.frame(minWidth: 0, maxWidth: .infinity)
     }
     func adjustment(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String, action: @escaping () -> Void) -> some View {
         VStack(spacing: 4) {
