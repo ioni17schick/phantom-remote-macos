@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2-beta — 2026-11-22
+
+- Update-Prüfung: Knopf in der Fußzeile und App-Menü „Nach Updates suchen …“; optional einmal täglich automatisch (standardmäßig aus).
+- Bei einer neuen Version wird nur die Release-Seite geöffnet – keine automatische Installation, da die App nicht notarisiert ist.
+- Nur Release-Links genau dieses Repositorys werden geöffnet; Entwürfe werden ignoriert.
+- Datenschutz-Abschnitt im README entsprechend ergänzt.
+- 84 Regressionstests (Versionsvergleich, Link-Prüfung, Standard „aus“, Tagesabstand).
+
 ## 0.1.1-beta — 2026-11-22
 
 Korrekturen nach einem externen KI-Code-Review (Grok); jede Korrektur hat einen Regressionstest, der ohne sie fehlschlägt.

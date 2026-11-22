@@ -76,6 +76,17 @@ actor MockTransport: RemoteTransport {
     }
 }
 
+
+actor GitHubMock: RemoteTransport {
+    var body = "[]"
+    var status = 200
+    var requests: [URLRequest] = []
+    func set(_ json: String, status: Int = 200) { body = json; self.status = status }
+    func count() -> Int { requests.count }
+    func lastUserAgent() -> String? { requests.last?.value(forHTTPHeaderField: "User-Agent") }
+    func send(_ request: URLRequest) async throws -> (Data, Int) { requests.append(request); return (Data(body.utf8), status) }
+}
+
 @main struct RegressionTests {
     @MainActor static var checks = 0
     @MainActor static func expect(_ condition: Bool, _ label: String) {
@@ -246,6 +257,60 @@ actor MockTransport: RemoteTransport {
         let (lostApp, lostMock, _) = try await fixture()
         await lostMock.setFailReads(true); await lostApp.refresh()
         expect(!lostApp.online && lostApp.errorMessage?.contains("Verbindung") == true, "losing the connection while reading is shown in the banner")
+        // --- Update-Prüfung (simulierte GitHub-Antwort, kein Internet) ---
+        func v(_ t: String) -> AppVersion { AppVersion(t)! }
+        expect(v("0.1.1") < v("0.1.2-beta") && v("0.1.9") < v("0.1.10"), "versions compare numerically, not as text")
+        expect(v("v0.1.1-beta") < v("0.1.1") && v("0.1.1") == v("v0.1.1"), "beta is older than final; leading v ignored")
+        expect(v("1.0-beta.2") < v("1.0-beta.10"), "pre-release suffixes compare naturally")
+        expect(AppVersion("abc") == nil && AppVersion("1..2") == nil && AppVersion("") == nil, "garbage versions are rejected")
+        let repo = UpdateChecker.repository
+        expect(UpdateChecker.trustedPage("https://github.com/\(repo)/releases/tag/v9.0") != nil, "own release page is trusted")
+        for bad in ["http://github.com/\(repo)/releases/tag/v9", "https://evil.example/\(repo)/releases/tag/v9",
+                    "https://github.com/someone/else/releases/tag/v9", "https://user@github.com/\(repo)/releases/tag/v9"] {
+            expect(UpdateChecker.trustedPage(bad) == nil, "foreign link is never opened: \(bad)")
+        }
+        let gh = GitHubMock()
+        let releasesJSON = """
+        [{"tag_name":"v0.1.2-beta","html_url":"https://github.com/\(repo)/releases/tag/v0.1.2-beta","draft":false},
+         {"tag_name":"v9.9.9","html_url":"https://github.com/\(repo)/releases/tag/v9.9.9","draft":true},
+         {"tag_name":"v5.0.0","html_url":"https://evil.example/x","draft":false},
+         {"tag_name":"v0.1.1-beta","html_url":"https://github.com/\(repo)/releases/tag/v0.1.1-beta","draft":false}]
+        """
+        await gh.set(releasesJSON)
+        let older = UpdateChecker(current: "0.1.1", transport: gh, defaults: nil)
+        await older.check()
+        expect(older.state == .available(version: "0.1.2-beta", page: URL(string: "https://github.com/\(repo)/releases/tag/v0.1.2-beta")!),
+               "newer release found; drafts and foreign links ignored")
+        let ua = await gh.lastUserAgent() ?? ""
+        expect(ua == "PhantomRemote/0.1.1", "request identifies only app and version")
+        let same = UpdateChecker(current: "0.1.2", transport: gh, defaults: nil)
+        await same.check()
+        expect(same.state == .upToDate, "no update offered when current is newest")
+        await gh.set("{}", status: 403)
+        let limited = UpdateChecker(current: "0.1.1", transport: gh, defaults: nil)
+        await limited.check()
+        if case .failed = limited.state { expect(true, "API error is shown as failure, not as up to date") }
+        else { expect(false, "API error is shown as failure, not as up to date") }
+
+        let suite = "phantomremote.tests.\(UUID().uuidString)"
+        let store = UserDefaults(suiteName: suite)!
+        defer { store.removePersistentDomain(forName: suite) }
+        await gh.set(releasesJSON)
+        let ghBefore = await gh.count()
+        let auto = UpdateChecker(current: "0.1.1", transport: gh, defaults: store)
+        expect(!auto.autoCheck, "automatic update check is off by default")
+        await auto.checkAutomaticallyIfDue()
+        let afterOff = await gh.count()
+        expect(afterOff == ghBefore, "no network request while automatic check is off")
+        auto.autoCheck = true
+        let t0 = Date()
+        await auto.checkAutomaticallyIfDue(now: t0)
+        await auto.checkAutomaticallyIfDue(now: t0.addingTimeInterval(3600))
+        let afterTwo = await gh.count()
+        expect(afterTwo == ghBefore + 1, "automatic check runs at most once per day")
+        await auto.checkAutomaticallyIfDue(now: t0.addingTimeInterval(25 * 3600))
+        let afterDay = await gh.count()
+        expect(afterDay == ghBefore + 2, "automatic check runs again after 24 hours")
         print("\(checks) checks passed. Mock transport only; no physical devices contacted.")
     }
 }

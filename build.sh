@@ -9,7 +9,7 @@ fi
 BUILD="$PWD/.build"
 APP="$BUILD/Phantom Remote.app"
 mkdir -p "$BUILD" "$APP/Contents/MacOS" "$APP/Contents/Resources"
-SOURCES=(Models.swift Discovery.swift Core.swift Views.swift)
+SOURCES=(Models.swift Discovery.swift Updates.swift Core.swift Views.swift)
 SWIFT_FLAGS=(-swift-version 6 -strict-concurrency=complete -warnings-as-errors -parse-as-library)
 # Build the icon helper for the build host; the app itself is universal.
 xcrun swiftc "${SWIFT_FLAGS[@]}" -target "$(uname -m)-apple-macos14" "${SOURCES[@]}" make_icon.swift -o "$BUILD/make_icon"
@@ -34,8 +34,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleExecutable</key><string>PhantomRemote</string>
 <key>CFBundleIconFile</key><string>AppIcon</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>0.1.1</string>
-<key>CFBundleVersion</key><string>2</string>
+<key>CFBundleShortVersionString</key><string>0.1.2</string>
+<key>CFBundleVersion</key><string>3</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>
 <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
 <key>NSHighResolutionCapable</key><true/>

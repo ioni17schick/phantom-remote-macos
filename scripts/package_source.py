@@ -8,7 +8,7 @@ import zipfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 FILES = [
     '.gitignore', 'App.swift', 'Core.swift', 'Discovery.swift', 'Models.swift',
-    'Views.swift', 'make_icon.swift', 'build.sh', 'test.sh', 'README.md',
+    'Views.swift', 'Updates.swift', 'make_icon.swift', 'build.sh', 'test.sh', 'README.md',
     'LICENSE', 'CONTRIBUTING.md', 'SECURITY.md', 'CHANGELOG.md',
     'Tests/RegressionTests.swift', '.github/workflows/ci.yml',
     'scripts/package_source.py', 'scripts/release.sh',

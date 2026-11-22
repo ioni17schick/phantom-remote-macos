@@ -195,6 +195,7 @@ struct MainView: View {
                     Text("⌃⌥↑ / ↓ Lautstärke · ⌃⌥M Stumm").font(.system(size: 10)).foregroundStyle(.secondary)
                     Spacer()
                     if p.pending > 0 { ProgressView().controlSize(.small) }
+                    UpdateStatusView()
                     Button("Verbindung prüfen") { Task { await p.refresh() } }.disabled(p.busy || p.target == nil).controlSize(.small)
                 }
             }.padding(26)
@@ -312,6 +313,8 @@ struct DevicesView: View {
             Divider()
             Stepper("Lautstärkelimit dieser App: \(p.volumeLimit)", value: $p.volumeLimit, in: 0...100).disabled(p.busy)
             Text("Standard: 60. Das Limit gilt nur für Befehle dieser App. Andere Apps und Zuspieler können weiterhin lauter stellen. Eine bereits höhere Lautstärke wird nicht automatisch abgesenkt.").font(.caption).foregroundStyle(.secondary)
+            Divider()
+            AutoUpdateToggle()
             if p.target != nil {
                 HStack {
                     Text("Gespeichert: \(p.host)").font(.caption).foregroundStyle(.secondary)
@@ -339,6 +342,7 @@ struct MenuPanel: View {
                 Text("\(Int(p.volume))").monospacedDigit()
             }.disabled(!p.canControl)
             Button(p.muted ? "Stummschaltung aufheben" : "Stummschalten") { Task { await p.toggleMute(hud: false) } }.disabled(!p.canControl)
+            MenuUpdateHint()
             Divider()
             HStack {
                 Button("Fenster öffnen") { openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true) }
@@ -347,5 +351,70 @@ struct MenuPanel: View {
             }
         }.padding(14).frame(width: 340)
             .onAppear { p.viewAppeared() }.onDisappear { p.viewDisappeared() }
+    }
+}
+
+// MARK: - Updates
+
+/// Fußzeile: Version, Prüf-Button und Ergebnis. Öffnet bei einem Update nur die Release-Seite.
+struct UpdateStatusView: View {
+    @ObservedObject var u = UpdateChecker.shared
+    var body: some View {
+        HStack(spacing: 6) {
+            switch u.state {
+            case .idle:
+                Button("\(u.currentText) · Nach Updates suchen") { Task { await u.check() } }
+            case .checking:
+                ProgressView().controlSize(.small)
+                Text("Suche Updates …").foregroundStyle(.secondary)
+            case .upToDate:
+                Label("\(u.currentText) ist aktuell", systemImage: "checkmark.circle").foregroundStyle(.secondary)
+                    .onTapGesture { Task { await u.check() } }
+                    .help("Klicken, um erneut zu prüfen")
+            case .available(let version, let page):
+                Button { NSWorkspace.shared.open(page) } label: {
+                    Label("Update \(version) – Herunterladen", systemImage: "arrow.down.circle.fill")
+                }
+                .buttonStyle(.borderedProminent).tint(.accentWarm).foregroundStyle(.black)
+                .help("Öffnet die Release-Seite auf GitHub. Die App installiert nichts selbst.")
+            case .failed(let message):
+                Image(systemName: "exclamationmark.triangle").foregroundStyle(.orange).help(message)
+                Button("Erneut prüfen") { Task { await u.check() } }.help(message)
+            }
+        }
+        .font(.system(size: 11)).controlSize(.small)
+    }
+}
+
+/// Einstellung im Geräte-Fenster – standardmäßig aus.
+struct AutoUpdateToggle: View {
+    @ObservedObject var u = UpdateChecker.shared
+    var body: some View {
+        Toggle("Einmal täglich automatisch nach Updates suchen", isOn: $u.autoCheck)
+        Text("Fragt dafür die öffentliche GitHub-API ab (keine persönlichen Daten, keine automatische Installation). Ohne diese Option wird nur auf Knopfdruck geprüft.")
+            .font(.caption).foregroundStyle(.secondary)
+    }
+}
+
+/// Hinweis im Menüleisten-Fenster, nur wenn ein Update gefunden wurde.
+struct MenuUpdateHint: View {
+    @ObservedObject var u = UpdateChecker.shared
+    var body: some View {
+        if case .available(let version, let page) = u.state {
+            Button { NSWorkspace.shared.open(page) } label: {
+                Label("Update \(version) verfügbar", systemImage: "arrow.down.circle.fill")
+            }.tint(.accentWarm)
+        }
+    }
+}
+
+/// App-Menü-Eintrag: öffnet das Fenster (dort steht das Ergebnis) und startet die Prüfung.
+struct CheckForUpdatesCommand: View {
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Button("Nach Updates suchen …") {
+            openWindow(id: "main"); NSApp.activate(ignoringOtherApps: true)
+            Task { await UpdateChecker.shared.check() }
+        }
     }
 }

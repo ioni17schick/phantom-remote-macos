@@ -5,6 +5,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ n: Notification) {
         Hotkeys.register()
+        Task { await UpdateChecker.shared.checkAutomaticallyIfDue() }
         _ = Phantom.shared
     }
     // Fenster schließen beendet die App nicht – Tastenkürzel & Menüleiste bleiben aktiv
@@ -25,6 +26,7 @@ struct PhantomRemoteApp: App {
         .windowResizability(.contentSize)
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(after: .appInfo) { CheckForUpdatesCommand() }
             CommandMenu("Wiedergabe") {
                 Button("Lauter") { Task { await p.step(3) } }.keyboardShortcut(.upArrow, modifiers: .command).disabled(!p.canControl)
                 Button("Leiser") { Task { await p.step(-3) } }.keyboardShortcut(.downArrow, modifiers: .command).disabled(!p.canControl)

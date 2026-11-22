@@ -20,6 +20,7 @@ Es gab bislang **kein unabhängiges menschliches Code-Audit**. Automatisierte Te
 - Identifizierungston pro Lautsprecher und Prüfung seiner HTTP-Erreichbarkeit. Die angezeigten Millisekunden sind HTTP-Antwortzeiten, kein ICMP-Ping.
 - Menüleistensteuerung und globale Kürzel: **⌃⌥↑**, **⌃⌥↓**, **⌃⌥M**.
 - Sichtbare Fehlermeldungen. Fehlgeschlagene Befehle werden nicht als erfolgreich bestätigt.
+- Update-Prüfung per Knopf (Fußzeile oder App-Menü „Nach Updates suchen …“), optional täglich automatisch. Sie öffnet bei einer neuen Version nur die Release-Seite; die App installiert nichts selbst, weil sie nicht notarisiert ist.
 
 ## Voraussetzungen und getesteter Umfang
 
@@ -115,7 +116,7 @@ Diese App ist eine **Fernbedienung, kein Audiotreiber**. Für Ton vom Mac den La
 
 ## Datenschutz
 
-Keine Telemetrie, kein Cloudkonto und kein Download von Produktgrafiken. Die App kontaktiert die lokal entdeckten oder von dir eingegebenen Geräte. Gespeichert werden das ausgewählte System, Geräte-IDs, Adressen und das Lautstärkelimit in macOS-UserDefaults (`org.phantomremote.mac`). Keine Gerätekennungen oder privaten Netzadressen sind im Quellcode voreingestellt. Seriennummern können in Geräteantworten enthalten sein, werden aber nicht als Adressen zusammengesetzt oder in der Konfiguration gespeichert.
+Keine Telemetrie, kein Cloudkonto und kein Download von Produktgrafiken. Die App kontaktiert die lokal entdeckten oder von dir eingegebenen Geräte. Einzige Ausnahme ist die **Update-Prüfung**: Sie fragt die öffentliche GitHub-API nach Releases dieses Projekts ab – nur auf Knopfdruck oder, wenn du es unter **Geräte …** einschaltest, höchstens einmal täglich beim Start (standardmäßig aus). Gesendet wird dabei nur `PhantomRemote/<Version>` als User-Agent; GitHub sieht wie bei jedem Abruf deine IP-Adresse. Gespeichert werden das ausgewählte System, Geräte-IDs, Adressen und das Lautstärkelimit in macOS-UserDefaults (`org.phantomremote.mac`). Keine Gerätekennungen oder privaten Netzadressen sind im Quellcode voreingestellt. Seriennummern können in Geräteantworten enthalten sein, werden aber nicht als Adressen zusammengesetzt oder in der Konfiguration gespeichert.
 
 Fehlerberichte und Screenshots bitte vor Veröffentlichung auf private Namen, IDs und Adressen prüfen.
 
@@ -135,6 +136,7 @@ Das Paketwerkzeug erstellt `dist/phantom-remote-source-0.1.0-beta.zip` aus einer
 |---|---|
 | `Models.swift` | API-Daten, Adressprüfung, HTTP-Transport, Lautstärkeregeln |
 | `Discovery.swift` | Bonjour/mDNS-Erkennung |
+| `Updates.swift` | Versionsvergleich und Update-Prüfung über die GitHub-API |
 | `Core.swift` | Zustände, feste Gerätezuordnung, geordnete Befehle |
 | `Views.swift` | Oberfläche und eigenständige neutrale Lautsprechergrafik |
 | `App.swift` | App-Fenster, Menüleiste, Menüs |
